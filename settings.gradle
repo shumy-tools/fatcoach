@@ -1,0 +1,3 @@
+include 'fc-api', 'fc-dsl'
+
+rootProject.name = 'fatcoach'
