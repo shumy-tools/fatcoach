@@ -3,12 +3,12 @@ package fc.api
 const val ID = "@id"
 const val PARENT = "@parent"
 
-enum class OType {
-  ADD, REMOVE
-}
+typealias FcData = Map<String, Any?>
 
-class RefID {
-  var id: Long? = null
+enum class OType { ADD, DEL }
+
+class RefID(id: Long? = null) {
+  var id: Long? = id
     internal set
 
   override fun toString() = "RefID(id=$id)"

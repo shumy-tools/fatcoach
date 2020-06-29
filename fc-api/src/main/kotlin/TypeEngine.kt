@@ -6,10 +6,9 @@ import java.time.LocalTime
 import kotlin.reflect.KClass
 
 enum class FType {
-  REFID,
   TEXT, INT, LONG, FLOAT, DOUBLE, BOOL,
   TIME, DATE, DATETIME,
-  MAP, LIST, SET
+  MAP, LIST, SET,
 }
 
 object TypeEngine {

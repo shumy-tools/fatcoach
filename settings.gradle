@@ -1,3 +1,3 @@
-include 'fc-api', 'fc-dsl'
+include 'fc-api'
 
 rootProject.name = 'fatcoach'

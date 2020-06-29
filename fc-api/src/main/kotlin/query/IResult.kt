@@ -1,6 +1,6 @@
 package fc.api.query
 
-typealias FcData = Map<String, Any?>
+import fc.api.FcData
 
 interface IRowGet {
   fun <R: Any> get(name: String): R?

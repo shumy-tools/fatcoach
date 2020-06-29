@@ -1,28 +1,33 @@
 package fc.api
 
-import fc.api.query.FcData
+import fc.api.input.CreateCompiler
+import fc.api.input.DeleteCompiler
+import fc.api.input.UpdateCompiler
 import fc.api.spi.FcCreate
 import fc.api.spi.FcDelete
 import fc.api.spi.FcUpdate
 import fc.api.spi.InputInstructions
 
-class FcTxData(private val schema: FcSchema) {
+class FcTxData internal constructor(private val schema: FcSchema) {
   internal val instructions = InputInstructions()
 
-  fun create(entity: String, data: FcData): RefID {
-    val sEntity = schema.all[entity] ?: throw Exception("SEntity '$entity' not found!")
-    return create(sEntity, data)
+  fun create(dsl: String): RefID {
+    val compiled = CreateCompiler(dsl, schema)
+    if (compiled.errors.isNotEmpty())
+      throw Exception("Failed to compile create! ${compiled.errors}")
+
+    return create(compiled.entity, compiled.data)
   }
 
   fun create(sEntity: SEntity, data: FcData): RefID {
     // check and create all input (fields / linkedRefs / linkedCols)
-    val inputFields = sEntity.inputFields.map { it.name to it.check(data[it.name]) }.toMap()
-    val inputLinkedRefs = sEntity.inputLinkedRefs.map { it.name to it.checkRef(data[it.name]) }.toMap()
-    val inputLinkedCols = sEntity.inputLinkedCols.map { it.name to it.checkRefs(data[it.name]) }.toMap()
+    val inputFields = sEntity.inputFields.map { it to it.check(data[it.name]) }.toMap()
+    val inputLinkedRefs = sEntity.inputLinkedRefs.map { it to it.checkRef(data[it.name]) }.toMap()
+    val inputLinkedCols = sEntity.inputLinkedCols.map { it to it.checkRefs(data[it.name]) }.toMap()
 
     // check and create recursively all (input ownedRefs / ownedCols)
-    val inputOwnedRefs = sEntity.inputOwnedRefs.map { it.name to it.convert(data[it.name]) }.toMap()
-    val inputOwnedCols = sEntity.inputOwnedCols.map { it.name to it.convert(data[it.name]) }.toMap()
+    val inputOwnedRefs = sEntity.inputOwnedRefs.map { it to it.convert(data[it.name]) }.toMap()
+    val inputOwnedCols = sEntity.inputOwnedCols.map { it to it.convert(data[it.name]) }.toMap()
 
     val refID = RefID()
     val inputs = inputFields.plus(inputLinkedRefs).plus(inputLinkedCols).plus(inputOwnedRefs).plus(inputOwnedCols)
@@ -30,9 +35,12 @@ class FcTxData(private val schema: FcSchema) {
     return refID
   }
 
-  fun update(entity: String, refID: RefID, data: FcData) {
-    val sEntity = schema.all[entity] ?: throw Exception("SEntity '$entity' not found!")
-    return update(sEntity, refID, data)
+  fun update(dsl: String) {
+    val compiled = UpdateCompiler(dsl, schema)
+    if (compiled.errors.isNotEmpty())
+      throw Exception("Failed to compile update! ${compiled.errors}")
+
+    return update(compiled.entity, compiled.refID, compiled.data)
   }
 
   fun update(sEntity: SEntity, refID: RefID, data: FcData) {
@@ -47,17 +55,20 @@ class FcTxData(private val schema: FcSchema) {
       throw Exception("Cannot add/remove owned references/collections. Use update with @parent")
 
     // check and create all input (fields / linkedRefs / linkedCols)
-    val inputFields = inputProperties.filterIsInstance<SField>().map { it.name to it.check(data[it.name]) }.toMap()
-    val inputLinkedRefs = inputProperties.filterIsInstance<SReference>().map { it.name to it.checkRef(data[it.name], true) }.toMap()
-    val inputLinkedCols = inputProperties.filterIsInstance<SCollection>().map { it.name to it.checkRefs(data[it.name], true) }.toMap()
+    val inputFields = inputProperties.filterIsInstance<SField>().map { it to it.check(data[it.name]) }.toMap()
+    val inputLinkedRefs = inputProperties.filterIsInstance<SReference>().map { it to it.checkRef(data[it.name], true) }.toMap()
+    val inputLinkedCols = inputProperties.filterIsInstance<SCollection>().map { it to it.checkRefs(data[it.name], true) }.toMap()
 
     val inputs = inputFields.plus(inputLinkedRefs).plus(inputLinkedCols)
     instructions.add(FcUpdate(sEntity, refID, inputs))
   }
 
-  fun delete(entity: String, refID: RefID) {
-    val sEntity = schema.all[entity] ?: throw Exception("SEntity '$entity' not found!")
-    return delete(sEntity, refID)
+  fun delete(dsl: String) {
+    val compiled = DeleteCompiler(dsl, schema)
+    if (compiled.errors.isNotEmpty())
+      throw Exception("Failed to compile delete! ${compiled.errors}")
+
+    return delete(compiled.entity, compiled.refID)
   }
 
   fun delete(sEntity: SEntity, refID: RefID) {
@@ -71,27 +82,25 @@ class FcTxData(private val schema: FcSchema) {
 
     if (value == null) return null
 
-    val data = try {
-      value as FcData
-    } catch (ex: Exception) {
+    if (value !is Map<*, *>)
       throw Exception("Expecting map of 'FcData' for '${entity!!.name}:$name', found ${value.javaClass.kotlin.simpleName}")
-    }
 
-    return create(ref, data)
+    return create(ref, value as FcData)
   }
 
   @Suppress("UNCHECKED_CAST")
   private fun SCollection.convert(value: Any?): List<RefID> {
     value ?: throw Exception("Expecting owned collection for '${entity!!.name}:$name'")
 
-    val data = try {
-      (value as List<*>).forEach { it as FcData }
-      value as List<FcData>
-    } catch (ex: Exception) {
-      throw Exception("Expecting collection of 'FcData' for '${entity!!.name}:$name', found ${value.javaClass.kotlin.simpleName}")
+    if (value !is List<*>)
+      throw Exception("Expecting collection for '${entity!!.name}:$name', found ${value.javaClass.kotlin.simpleName}")
+
+    (value).forEach {
+      if (it !is Map<*, *>)
+        throw Exception("Expecting collection of 'FcData' for '${entity!!.name}:$name', found ${value.javaClass.kotlin.simpleName}")
     }
 
-    return data.map { create(ref, it) }
+    return value.map { create(ref, it as FcData) }
   }
 }
 
@@ -125,19 +134,20 @@ private fun SReference.checkRef(value: Any?, isUpdate: Boolean = false): Any? {
 private fun SCollection.checkRefs(value: Any?, isUpdate: Boolean = false): List<Any> {
   value ?: throw Exception("Expecting collection for '${entity!!.name}:$name'")
 
-  return if (isUpdate) {
-    try {
-      (value as List<*>).forEach { it as RefLink }
-      value as List<Any>
-    } catch (ex: Exception) {
-      throw Exception("On update, expecting collection of 'RefLink' for '${entity!!.name}:$name', found ${value.javaClass.kotlin.simpleName}")
+  if (value !is List<*>)
+    throw Exception("On update, expecting collection for '${entity!!.name}:$name', found ${value.javaClass.kotlin.simpleName}")
+
+  if (isUpdate) {
+    value.forEach {
+      if (it !is RefLink)
+        throw Exception("On update, expecting collection of 'RefLink' for '${entity!!.name}:$name', found ${value.javaClass.kotlin.simpleName}")
     }
   } else {
-    try {
-      (value as List<*>).forEach { it as RefID }
-      value as List<Any>
-    } catch (ex: Exception) {
-      throw Exception("On create, expecting collection of 'RefID' for '${entity!!.name}:$name', found ${value.javaClass.kotlin.simpleName}")
+    value.forEach {
+      if (it !is RefID)
+        throw Exception("On create, expecting collection of 'RefID' for '${entity!!.name}:$name', found ${value.javaClass.kotlin.simpleName}")
     }
   }
+
+  return value as List<Any>
 }
