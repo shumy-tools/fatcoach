@@ -33,3 +33,14 @@ object TypeEngine {
     return fType == classToType[vType]
   }
 }
+
+fun SField.tryType(tryType: FType) {
+  val implicitConvert = when (type) {
+    FType.INT -> FType.LONG
+    FType.FLOAT -> FType.DOUBLE
+    else -> type
+  }
+
+  if (implicitConvert != tryType)
+    throw Exception("Expecting typeOf ${type.name.toLowerCase()} for '${entity!!.name}.$name'. Trying to assign a ${tryType.name.toLowerCase()}.")
+}

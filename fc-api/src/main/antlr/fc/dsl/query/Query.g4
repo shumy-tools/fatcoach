@@ -25,21 +25,21 @@ qline: filter? (limit page?)? select ;
 
       param: value | list ;
 
-        value: TEXT | INT | FLOAT | BOOL | TIME | DATE | DATETIME | PARAM ;
-
         list: '[' value (',' value)* ']';
 
-  limit: 'limit' intOrParam ;
+        value: NULL | TEXT | LONG | DOUBLE | BOOL | TIME | DATE | DATETIME | PARAM ;
 
-  page: 'page' intOrParam ;
+  limit: 'limit' longOrParam ;
 
-    intOrParam: (INT | PARAM) ;
+  page: 'page' longOrParam ;
+
+    longOrParam: (LONG | PARAM) ;
 
   select: '{' fields (',' relation)* '}' ;
 
     fields: ALL | (field (',' field)*) ;
 
-      field: ('(' order INT ')')? ID ;
+      field: ('(' order LONG ')')? ID ;
 
         order: ('asc' | 'dsc') ;
 

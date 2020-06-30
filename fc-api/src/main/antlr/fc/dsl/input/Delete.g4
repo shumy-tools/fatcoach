@@ -3,6 +3,8 @@ grammar Delete;
 
 import Common;
 
-delete: entity '@id=' id=INT ;
+delete: entity '@id' '=' id=longOrParam ;
+
+  longOrParam: (LONG | PARAM) ;
 
   entity: (ID '.')* NAME ;

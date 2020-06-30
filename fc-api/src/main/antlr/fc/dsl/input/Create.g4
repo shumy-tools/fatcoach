@@ -9,6 +9,8 @@ create: entity data ;
 
   data: '{' entry (',' entry)* '}' ;
 
-    entry: ID ':' ( data | value ) ;
+    entry: ID ':' ( data | list | value ) ;
 
-      value: TEXT | INT | FLOAT | BOOL | TIME | DATE | DATETIME | PARAM ;
+      list: '[' ((value (',' value)*) | (data (',' data)*)) ']' ;
+
+        value: NULL | TEXT | LONG | DOUBLE | BOOL | TIME | DATE | DATETIME | PARAM ;

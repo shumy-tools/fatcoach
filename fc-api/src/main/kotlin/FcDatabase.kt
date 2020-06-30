@@ -13,7 +13,7 @@ class FcDatabase(private val adaptor: IAdaptor) {
 
     val txData = FcTxData(schema)
     transaction(txData)
-    adaptor.execInput(txData.instructions)
+    adaptor.execInput(txData.tx)
   }
 
   fun get(sEntity: SEntity, id: Long): FcData {

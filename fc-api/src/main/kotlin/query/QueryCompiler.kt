@@ -73,13 +73,13 @@ internal class QueryCompiler(private val dsl: String, private val schema: FcSche
     val limit = limit()?.let {
       if (isReference)
         throw Exception("Direct references don't support 'limit'! Use it on the top entity.")
-      it.intOrParam().processLimitOrPage()
+      it.longOrParam().processLimitOrPage()
     }
 
     val page = page()?.let {
       if (isReference)
         throw Exception("Direct references don't support 'page'! Use it on the top entity.")
-      it.intOrParam().processLimitOrPage()
+      it.longOrParam().processLimitOrPage()
     }
 
     // process filter paths
@@ -91,9 +91,9 @@ internal class QueryCompiler(private val dsl: String, private val schema: FcSche
     return QRelation(filter, limit, page, select)
   }
 
-  private fun IntOrParamContext.processLimitOrPage(): Any {
-    return if (INT() != null) {
-      val value = INT().text.toInt()
+  private fun LongOrParamContext.processLimitOrPage(): Any {
+    return if (LONG() != null) {
+      val value = LONG().text.toInt()
       if (value < 1)
         throw Exception("'limit' and 'page' must be > 0")
       value
@@ -108,7 +108,7 @@ internal class QueryCompiler(private val dsl: String, private val schema: FcSche
     val sEntity = stack.peek()
     return map {
       val prop = it.ID().text
-      val rel = sEntity.rels[prop] ?: throw Exception("Invalid relation '$${sEntity.name}.$prop'")
+      val rel = sEntity.rels[prop] ?: throw Exception("Invalid relation '${sEntity.name}.$prop'.")
       accessed.add(rel)
 
       scope(rel.ref) {
@@ -127,11 +127,11 @@ internal class QueryCompiler(private val dsl: String, private val schema: FcSche
     } else {
       field().map {
         val prop = it.ID().text
-        val field = sEntity.fields[prop] ?: throw Exception("Invalid field '$${sEntity.name}.$prop'")
+        val field = sEntity.fields[prop] ?: throw Exception("Invalid field '${sEntity.name}.$prop'.")
         accessed.add(field)
 
         val sortType = sortType(it.order()?.text)
-        val order = it.INT()?.let { ord ->
+        val order = it.LONG()?.let { ord ->
           val order = ord.text.toInt()
           if (order < 1)
             throw Exception("Order must be > 0")
@@ -249,10 +249,11 @@ private fun ParamContext.parse() = when {
   else -> throw Exception("Unrecognized parameter type!")
 }
 
-private fun ValueContext.parse(): Any = when {
+private fun ValueContext.parse(): Any? = when {
+  NULL() != null -> null
   TEXT() != null -> TEXT().text.substring(1, TEXT().text.length-1)
-  INT() != null -> INT().text.toInt()
-  FLOAT() != null -> FLOAT().text.toFloat()
+  LONG() != null -> LONG().text.toLong()
+  DOUBLE() != null -> DOUBLE().text.toDouble()
   BOOL() != null -> BOOL().text!!.toBoolean()
   TIME() != null -> LocalTime.parse(TIME().text.substring(1))
   DATE() != null -> LocalDate.parse(DATE().text.substring(1))

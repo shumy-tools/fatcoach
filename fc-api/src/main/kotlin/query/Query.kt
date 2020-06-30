@@ -77,7 +77,7 @@ data class QPredicate(
   val end: SField,
 
   val comp: CompType,
-  val param: Any                // expecting the 'end' type or QParameter
+  val param: Any?                // expecting the 'end' type or QParameter
 )
 
 // ----------- select structure -----------
