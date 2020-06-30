@@ -8,7 +8,7 @@ import kotlin.reflect.KClass
 enum class FType {
   TEXT, INT, LONG, FLOAT, DOUBLE, BOOL,
   TIME, DATE, DATETIME,
-  MAP, LIST, SET,
+  LIST, MAP
 }
 
 object TypeEngine {
@@ -26,8 +26,10 @@ object TypeEngine {
 
     put(Map::class, FType.MAP)
     put(List::class, FType.LIST)
-    put(Set::class, FType.SET)
   }
+
+  fun convert(vType: KClass<Any>): FType = classToType[vType] ?:
+    throw Exception("Unrecognized type, expecting one of typeOf (null, text, long, double, bool, time, data, datetime, list, map)")
 
   fun check(fType: FType, vType: KClass<Any>): Boolean {
     return fType == classToType[vType]
@@ -35,6 +37,10 @@ object TypeEngine {
 }
 
 fun SField.tryType(tryType: FType) {
+  // list and map can contain any value
+  if (type == FType.LIST || type == FType.MAP)
+    return
+
   val implicitConvert = when (type) {
     FType.INT -> FType.LONG
     FType.FLOAT -> FType.DOUBLE

@@ -13,4 +13,4 @@ create: entity data ;
 
       list: '[' ((value (',' value)*) | (data (',' data)*)) ']' ;
 
-        value: NULL | TEXT | LONG | DOUBLE | BOOL | TIME | DATE | DATETIME | PARAM ;
+      value: NULL | TEXT | LONG | DOUBLE | BOOL | TIME | DATE | DATETIME | PARAM ;

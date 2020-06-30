@@ -15,18 +15,15 @@ import java.time.LocalTime
 import java.util.*
 
 internal class QueryCompiler(private val dsl: String, private val schema: FcSchema): QueryBaseListener() {
-  val tree: QTree
+  lateinit var tree: QTree
+    internal set
+
   val parameters = linkedMapOf<String, QParameter>()
   val accessed = mutableSetOf<SProperty>()
   val errors = mutableListOf<String>()
 
-  private var tmpTree: QTree? = null
   private val stack = Stack<SEntity>()
-  init {
-    compile()
-    tree = tmpTree!!
-  }
-
+  init { compile() }
 
   private fun <R: Any> scope(sEntity: SEntity, scope: () -> R): R {
     stack.push(sEntity)
@@ -63,7 +60,7 @@ internal class QueryCompiler(private val dsl: String, private val schema: FcSche
 
     stack.push(sEntity)
     val rel = ctx.qline().processQLine()
-    tmpTree = QTree(sEntity, rel)
+    tree = QTree(sEntity, rel)
   }
 
   private fun QlineContext.processQLine(isReference: Boolean = false): QRelation {

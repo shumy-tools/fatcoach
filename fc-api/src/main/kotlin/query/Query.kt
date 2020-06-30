@@ -35,6 +35,8 @@ class Query internal constructor(dsl: String, private val adaptor: IAdaptor) {
   }
 
   fun exec(args: Map<String, Any>): IResult {
+    // TODO: check security on accessed properties?
+
     parameters.forEach {
       val arg = args[it.name] ?: throw Exception("Expected parameter value for: '${it.name}'")
       if (!TypeEngine.check(it.type, arg.javaClass.kotlin))

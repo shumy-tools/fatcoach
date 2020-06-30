@@ -4,9 +4,9 @@ import fc.api.*
 import fc.api.spi.FcCreate
 import fc.api.spi.InputInstructions
 import fc.dsl.input.CreateBaseListener
+import fc.dsl.input.CreateLexer
 import fc.dsl.input.CreateParser
 import fc.dsl.input.CreateParser.*
-import fc.dsl.query.QueryLexer
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ErrorNode
@@ -17,19 +17,17 @@ import java.time.LocalTime
 import java.util.*
 
 internal class CreateCompiler(private val dsl: String, private val schema: FcSchema, private val tx: InputInstructions, private val args: Map<String, Any>): CreateBaseListener() {
-  val refID: RefID
-  val entity: SEntity
+  lateinit var refID: RefID
+    internal set
+
+  lateinit var entity: SEntity
+    internal set
+
   val accessed = mutableSetOf<SProperty>()
   val errors = mutableListOf<String>()
 
-  private var tmpRefID: RefID? = null
-  private var tmpEntity: SEntity? = null
   private val stack = Stack<SEntity>()
-  init {
-    compile()
-    refID = tmpRefID!!
-    entity = tmpEntity!!
-  }
+  init { compile() }
 
   private fun <R: Any> scope(sEntity: SEntity, scope: () -> R): R {
     stack.push(sEntity)
@@ -39,10 +37,12 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
   }
 
   private fun compile() {
-    val lexer = QueryLexer(CharStreams.fromString(dsl))
+    val lexer = CreateLexer(CharStreams.fromString(dsl))
     val tokens = CommonTokenStream(lexer)
     val parser = CreateParser(tokens)
     val tree = parser.create()
+
+    //tokens.tokens.forEach { println("${lexer.vocabulary.getDisplayName(it.type)} -> ${it.text}") }
 
     val walker = ParseTreeWalker()
     walker.walk(this, tree)
@@ -54,10 +54,11 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
 
   override fun enterCreate(ctx: CreateContext) {
     val eText = ctx.entity().text
-    tmpEntity = schema.find(eText)
+    println(eText)
+    entity = schema.find(eText)
 
-    stack.push(tmpEntity)
-    tmpRefID = ctx.data().processData() as RefID
+    stack.push(entity)
+    refID = ctx.data().processData() as RefID
   }
 
   private fun DataContext.processData(): Any {
@@ -79,7 +80,7 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
               throw Exception("Invalid reference for '${sEntity.name}.$prop'.")
 
             if (sProperty.type == RType.LINKED)
-              throw Exception("Expecting typeOf (null, int, param) for '${sEntity.name}.$prop'.")
+              throw Exception("Expecting typeOf (null, long, param) for '${sEntity.name}.$prop'.")
 
             scope(sProperty.ref) { it.data().processData() }
           }
@@ -103,7 +104,7 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
   private fun ValueContext.processValue(prop: SProperty): Any? {
     return when (prop) {
       is SField -> processField(prop)
-      is SReference -> processReference(prop, prop.isOptional)
+      is SReference -> processRefID(prop, prop.isOptional)
       is SCollection -> throw Exception("Expecting a collection for '${prop.entity!!.name}.${prop.name}'.")
     }
   }
@@ -111,12 +112,17 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
   private fun ListContext.processList(prop: SProperty): List<Any?> {
     return when (prop) {
       is SField -> {
-        prop.tryType(FType.LIST)
-        if (value() == null)
-          throw Exception("Expecting a collection of values for '${prop.entity!!.name}.${prop.name}'.")
-        value().map { it.processField(prop) }
+        when (prop.type) {
+          FType.LIST -> {
+            val value = value() ?: throw Exception("Expecting a collection of values for '${prop.entity!!.name}.${prop.name}'.")
+            value.map { it.processField(prop) }
+          }
 
-        // TODO: process field MAP ?
+          // TODO: process field MAP ?
+          FType.MAP -> TODO()
+
+          else -> throw Exception("Expecting a collection of values or objects for '${prop.entity!!.name}.${prop.name}'.")
+        }
       }
 
       is SCollection -> when (prop.type) {
@@ -129,7 +135,7 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
         RType.LINKED -> {
           if (value() == null)
             throw Exception("Expecting a collection of references for '${prop.entity!!.name}.${prop.name}'.")
-          value().map { it.processReference(prop, false) }
+          value().map { it.processRefID(prop, false) }
         }
       }
 
@@ -182,15 +188,14 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
     PARAM() != null -> {
       val key = PARAM().text.substring(1)
       val value = args[key] ?: throw Exception("Expecting an argument value for '${field.entity!!.name}.${field.name}'.")
-      if (value !is RefID)
-        throw Exception("Expecting typeOf RefID for '${field.entity!!.name}.${field.name}'.")
+      field.tryType(TypeEngine.convert(value.javaClass.kotlin))
       value
     }
 
-    else -> throw Exception("Expecting typeOf (null, text, int, float, bool, time, data, datetime, param) for '${field.entity!!.name}.${field.name}'.")
+    else -> throw Exception("Expecting typeOf (null, text, long, double, bool, time, data, datetime, param) for '${field.entity!!.name}.${field.name}'.")
   }
 
-  private fun ValueContext.processReference(ref: SRelation, isOptional: Boolean): RefID {
+  private fun ValueContext.processRefID(ref: SRelation, isOptional: Boolean): RefID {
     if (ref.type == RType.OWNED)
       throw Exception("Expecting an object for '${ref.entity!!.name}.${ref.name}'.")
 
@@ -211,7 +216,7 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
         value
       }
 
-      else -> throw Exception("Expecting typeOf (null, int, param=RefID) for '${ref.entity!!.name}.${ref.name}'.")
+      else -> throw Exception("Expecting typeOf (null, long, param=RefID) for '${ref.entity!!.name}.${ref.name}'.")
     }
   }
 }

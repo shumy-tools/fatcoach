@@ -1,22 +1,34 @@
 package fc.api
 
-enum class EType { MASTER, DETAIL, TRAIT }
+enum class EType { MASTER, DETAIL }
 enum class RType { OWNED, LINKED }
 
-class FcSchema {
+class FcSchema(onChange: (FcSchema.() -> Unit)? = null) {
   var committed = false
     internal set
 
   val all: Map<String, SEntity> = linkedMapOf()
   val masters: Map<String, SEntity> = linkedMapOf()
   val details: Map<String, SEntity> = linkedMapOf()
-  val traits: Map<String, SEntity> = linkedMapOf()
+
+  init {
+    if (onChange != null) {
+      onChange()
+      commit()
+    }
+  }
 
   fun find(entity: String): SEntity {
     return all[entity] ?: throw Exception("SEntity '$entity' not found!")
   }
 
-  infix fun add(sEntity: SEntity) {
+  inline fun entity(name: String, type: EType, onChange: SEntity.() -> Unit) {
+    val newEntity = SEntity(name, type)
+    add(newEntity)
+    newEntity.onChange()
+  }
+
+  fun add(sEntity: SEntity) {
     if (committed)
       throw Exception("Cannot change a committed schema. Invoke 'change' and set the desired changes.")
 
@@ -32,17 +44,15 @@ class FcSchema {
     when (sEntity.type) {
       EType.MASTER -> (masters as LinkedHashMap<String, SEntity>)[sEntity.name] = sEntity
       EType.DETAIL -> (details as LinkedHashMap<String, SEntity>)[sEntity.name] = sEntity
-      EType.TRAIT -> (traits as LinkedHashMap<String, SEntity>)[sEntity.name] = sEntity
     }
   }
 
-  infix fun del(name: String) {
+  fun del(name: String) {
     if (committed)
       throw Exception("Cannot change a committed schema. Invoke 'change' and set the desired changes.")
 
     (masters as LinkedHashMap<String, SEntity>).remove(name)
     (details as LinkedHashMap<String, SEntity>).remove(name)
-    (traits as LinkedHashMap<String, SEntity>).remove(name)
 
     val sEntity = (all as LinkedHashMap<String, SEntity>).remove(name)
     sEntity?.schema = null
@@ -57,8 +67,6 @@ class FcSchema {
 
   fun commit() { committed = true }
 }
-
-class SMultiplicity(val start: String, val end: String)
 
 class SEntity(val name: String, val type: EType) {
   internal var schema: FcSchema? = null
@@ -81,23 +89,7 @@ class SEntity(val name: String, val type: EType) {
   val linkedCols: List<SCollection>
     get() = rels.values.filterIsInstance<SCollection>().filter { it.type == RType.LINKED }
 
-  /* ------------------------- inputs -------------------------*/
-  val inputFields: List<SField>
-    get() = fields.values.filter { it.isInput }
-
-  val inputOwnedRefs: List<SReference>
-    get() = ownedRefs.filter { it.isInput }
-
-  val inputLinkedRefs: List<SReference>
-    get() = linkedRefs.filter { it.isInput }
-
-  val inputOwnedCols: List<SCollection>
-    get() = ownedCols.filter { it.isInput }
-
-  val inputLinkedCols: List<SCollection>
-    get() = linkedCols.filter { it.isInput }
-
-  private fun checkCommitted() {
+  private fun checkChange() {
     if (schema == null)
       throw Exception("Cannot change an orphan entity. Add the entity to a FcSchema.")
 
@@ -105,8 +97,23 @@ class SEntity(val name: String, val type: EType) {
       throw Exception("Cannot change a committed schema. Invoke 'change' and set the desired changes.")
   }
 
-  infix fun add(sProperty: SProperty) {
-    checkCommitted()
+  fun field(name: String, type: FType, isOptional: Boolean = false, isInput: Boolean = true, isUnique: Boolean = false) {
+    val newProperty = SField(name, type, isOptional, isInput, isUnique)
+    add(newProperty)
+  }
+
+  fun ref(name: String, type: RType, ref: SEntity, isOptional: Boolean = false, isInput: Boolean = true, isUnique: Boolean = false) {
+    val newProperty = SReference(name, type, ref, isOptional, isInput, isUnique)
+    add(newProperty)
+  }
+
+  fun col(name: String, type: RType, ref: SEntity, isInput: Boolean = true, isUnique: Boolean = false) {
+    val newProperty = SCollection(name, type, ref, isInput, isUnique)
+    add(newProperty)
+  }
+
+  fun add(sProperty: SProperty) {
+    checkChange()
 
     if (sProperty.entity != null)
       throw Exception("SProperty '${sProperty.name}' is already being used by a different SEntity '${sProperty.entity!!.name}'.")
@@ -123,7 +130,8 @@ class SEntity(val name: String, val type: EType) {
       is SReference -> {
         if (sProperty.type == RType.OWNED) {
           own(sProperty.name, sProperty.ref)
-          sProperty.ref add SReference(PARENT, RType.LINKED, this) // set the @parent property for owned entities
+          // set the @parent property for owned entities
+          sProperty.ref.add(SReference(PARENT, RType.LINKED, ref = this, isOptional = false, isInput = true, isUnique = true))
         }
 
         (rels as LinkedHashMap<String, SRelation>)[sProperty.name] = sProperty
@@ -132,7 +140,8 @@ class SEntity(val name: String, val type: EType) {
       is SCollection -> {
         if (sProperty.type == RType.OWNED) {
           own(sProperty.name, sProperty.ref)
-          sProperty.ref add SReference(PARENT, RType.LINKED, this) // set the @parent property for owned entities
+          // set the @parent property for owned entities
+          sProperty.ref.add(SReference(PARENT, RType.LINKED, ref = this, isOptional = false, isInput = true, isUnique = false))
         }
 
         (rels as LinkedHashMap<String, SRelation>)[sProperty.name] = sProperty
@@ -140,8 +149,8 @@ class SEntity(val name: String, val type: EType) {
     }
   }
 
-  infix fun del(name: String) {
-    checkCommitted()
+  fun del(name: String) {
+    checkChange()
 
     if (name == PARENT)
       throw Exception("Cannot remove '$PARENT' from a SEntity.")
@@ -161,9 +170,9 @@ sealed class SProperty(val name: String, val isInput: Boolean, val isUnique: Boo
   class SField(
     name: String,
     val type: FType,
-    val isOptional: Boolean = false,
-    isInput: Boolean = true,
-    isUnique: Boolean = false
+    val isOptional: Boolean,
+    isInput: Boolean,
+    isUnique: Boolean
   ): SProperty(name, isInput, isUnique)
 
   sealed class SRelation(
@@ -178,18 +187,17 @@ sealed class SProperty(val name: String, val isInput: Boolean, val isUnique: Boo
       name: String,
       type: RType,
       ref: SEntity,
-      val isOptional: Boolean = false,
-      isInput: Boolean = true,
-      isUnique: Boolean = false
+      val isOptional: Boolean,
+      isInput: Boolean,
+      isUnique: Boolean
     ): SRelation(name, type, ref, isInput, isUnique)
 
     class SCollection(
       name: String,
       type: RType,
       ref: SEntity,
-      val multiplicity: SMultiplicity = SMultiplicity("0", "*"),
-      isInput: Boolean = true,
-      isUnique: Boolean = false
+      isInput: Boolean,
+      isUnique: Boolean
     ): SRelation(name, type, ref, isInput, isUnique)
 
 /* ------------------------- helpers -------------------------*/
@@ -206,13 +214,13 @@ fun SEntity.own(prop: String, ref: SEntity) {
 fun SEntity.clone(): SEntity = SEntity(name, type).also {
   for (prop in all.values) {
     when (prop) {
-      is SField -> it add prop
+      is SField -> it.add(prop)
       is SRelation -> {
         // clone only entities from the original schema
         val ref = if (prop.ref.schema != null) prop.ref.clone() else prop.ref
         when (prop) {
-          is SReference -> it add SReference(prop.name, prop.type, ref, prop.isOptional, prop.isInput, prop.isUnique)
-          is SCollection -> it add SCollection(prop.name, prop.type, ref, prop.multiplicity, prop.isInput, prop.isUnique)
+          is SReference -> it.add(SReference(prop.name, prop.type, ref, prop.isOptional, prop.isInput, prop.isUnique))
+          is SCollection -> it.add(SCollection(prop.name, prop.type, ref, prop.isInput, prop.isUnique))
         }
       }
     }

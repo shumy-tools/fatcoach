@@ -8,7 +8,7 @@ import fc.api.spi.InputInstructions
 class FcTxData internal constructor(private val schema: FcSchema) {
   internal val tx = InputInstructions()
 
-  fun create(dsl: String, args: Map<String, Any>): RefID {
+  fun create(dsl: String, args: Map<String, Any> = emptyMap()): RefID {
     val compiled = CreateCompiler(dsl, schema, tx, args)
     if (compiled.errors.isNotEmpty())
       throw Exception("Failed to compile create! ${compiled.errors}")
@@ -19,8 +19,8 @@ class FcTxData internal constructor(private val schema: FcSchema) {
     return compiled.refID
   }
 
-  fun update(dsl: String) {
-    val compiled = UpdateCompiler(dsl, schema)
+  fun update(dsl: String, args: Map<String, Any> = emptyMap()) {
+    val compiled = UpdateCompiler(dsl, schema, tx, args)
     if (compiled.errors.isNotEmpty())
       throw Exception("Failed to compile update! ${compiled.errors}")
 
@@ -30,8 +30,8 @@ class FcTxData internal constructor(private val schema: FcSchema) {
     TODO()
   }
 
-  fun delete(dsl: String) {
-    val compiled = DeleteCompiler(dsl, schema)
+  fun delete(dsl: String, arg: RefID? = null) {
+    val compiled = DeleteCompiler(dsl, schema, tx, arg)
     if (compiled.errors.isNotEmpty())
       throw Exception("Failed to compile delete! ${compiled.errors}")
 
