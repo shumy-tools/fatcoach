@@ -22,10 +22,18 @@ class FcSchema(onChange: (FcSchema.() -> Unit)? = null) {
     return all[entity] ?: throw Exception("SEntity '$entity' not found!")
   }
 
-  inline fun entity(name: String, type: EType, onChange: SEntity.() -> Unit) {
-    val newEntity = SEntity(name, type)
+  inline fun master(name: String, onChange: SEntity.() -> Unit): SEntity {
+    val newEntity = SEntity(name, EType.MASTER)
     add(newEntity)
     newEntity.onChange()
+    return newEntity
+  }
+
+  inline fun detail(name: String, onChange: SEntity.() -> Unit): SEntity {
+    val newEntity = SEntity(name, EType.DETAIL)
+    add(newEntity)
+    newEntity.onChange()
+    return newEntity
   }
 
   fun add(sEntity: SEntity) {
@@ -70,7 +78,8 @@ class FcSchema(onChange: (FcSchema.() -> Unit)? = null) {
 
 class SEntity(val name: String, val type: EType) {
   internal var schema: FcSchema? = null
-  internal var ownedBy: SEntity? = null
+  //internal var ownedBy: SEntity? = null
+  internal var parent: SReference? = null
 
   val all: Map<String, SProperty> = linkedMapOf()
   val fields: Map<String, SField> = linkedMapOf()
@@ -102,13 +111,23 @@ class SEntity(val name: String, val type: EType) {
     add(newProperty)
   }
 
-  fun ref(name: String, type: RType, ref: SEntity, isOptional: Boolean = false, isInput: Boolean = true, isUnique: Boolean = false) {
-    val newProperty = SReference(name, type, ref, isOptional, isInput, isUnique)
+  fun linkedRef(name: String, ref: SEntity, isOptional: Boolean = false, isInput: Boolean = true, isUnique: Boolean = false) {
+    val newProperty = SReference(name, RType.LINKED, ref, isOptional, isInput, isUnique)
     add(newProperty)
   }
 
-  fun col(name: String, type: RType, ref: SEntity, isInput: Boolean = true, isUnique: Boolean = false) {
-    val newProperty = SCollection(name, type, ref, isInput, isUnique)
+  fun ownedRef(name: String, isOptional: Boolean = false, isInput: Boolean = true, isUnique: Boolean = false, owned: SEntity) {
+    val newProperty = SReference(name, RType.OWNED, owned, isOptional, isInput, isUnique)
+    add(newProperty)
+  }
+
+  fun linkedCol(name: String, ref: SEntity, isInput: Boolean = true, isUnique: Boolean = false) {
+    val newProperty = SCollection(name, RType.LINKED, ref, isInput, isUnique)
+    add(newProperty)
+  }
+
+  fun ownedCol(name: String, isInput: Boolean = true, isUnique: Boolean = false, owned: SEntity) {
+    val newProperty = SCollection(name, RType.OWNED, owned, isInput, isUnique)
     add(newProperty)
   }
 
@@ -128,22 +147,12 @@ class SEntity(val name: String, val type: EType) {
       is SField -> (fields as LinkedHashMap<String, SField>)[sProperty.name] = sProperty
 
       is SReference -> {
-        if (sProperty.type == RType.OWNED) {
-          own(sProperty.name, sProperty.ref)
-          // set the @parent property for owned entities
-          sProperty.ref.add(SReference(PARENT, RType.LINKED, ref = this, isOptional = false, isInput = true, isUnique = true))
-        }
-
+        own(sProperty) // set the @parent property for owned entities
         (rels as LinkedHashMap<String, SRelation>)[sProperty.name] = sProperty
       }
 
       is SCollection -> {
-        if (sProperty.type == RType.OWNED) {
-          own(sProperty.name, sProperty.ref)
-          // set the @parent property for owned entities
-          sProperty.ref.add(SReference(PARENT, RType.LINKED, ref = this, isOptional = false, isInput = true, isUnique = false))
-        }
-
+        own(sProperty) // set the @parent property for owned entities
         (rels as LinkedHashMap<String, SRelation>)[sProperty.name] = sProperty
       }
     }
@@ -201,14 +210,18 @@ sealed class SProperty(val name: String, val isInput: Boolean, val isUnique: Boo
     ): SRelation(name, type, ref, isInput, isUnique)
 
 /* ------------------------- helpers -------------------------*/
-fun SEntity.own(prop: String, ref: SEntity) {
-  if (ref.type != EType.DETAIL)
-    throw Exception("Only entities of type DETAIL can be owned. '${name}:$prop' trying to own '${ref.name}'.")
+fun SEntity.own(sProperty: SRelation) {
+  if (sProperty.type == RType.OWNED) {
+    if (sProperty.ref.type != EType.DETAIL)
+      throw Exception("Only entities of type DETAIL can be owned. '${name}:${sProperty.name}' trying to own '${sProperty.ref.name}'.")
 
-  if (ref.ownedBy != null)
-    throw Exception("SEntity '${ref.name}' already owned by '$name'.")
+    if (sProperty.ref.parent != null)
+      throw Exception("SEntity '${sProperty.ref.name}' already owned by '$name'.")
 
-  ref.ownedBy = this
+    val parentRef = SReference(PARENT, RType.LINKED, ref = this, isOptional = false, isInput = true, isUnique = (sProperty is SReference))
+    sProperty.ref.parent = parentRef
+    sProperty.ref.add(parentRef)
+  }
 }
 
 fun SEntity.clone(): SEntity = SEntity(name, type).also {

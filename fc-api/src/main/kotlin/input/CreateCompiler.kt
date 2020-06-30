@@ -26,13 +26,16 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
   val accessed = mutableSetOf<SProperty>()
   val errors = mutableListOf<String>()
 
-  private val stack = Stack<SEntity>()
+  private val parentStack = Stack<RefID>()
+  private val selfStack = Stack<Pair<RefID, SEntity>>()
   init { compile() }
 
-  private fun <R: Any> scope(sEntity: SEntity, scope: () -> R): R {
-    stack.push(sEntity)
+  private fun <R: Any> scope(parent: RefID, selfID: RefID, self: SEntity, scope: () -> R): R {
+    parentStack.push(parent)
+    selfStack.push(Pair(selfID, self))
       val result = scope()
-    stack.pop()
+    selfStack.pop()
+    parentStack.pop()
     return result
   }
 
@@ -54,15 +57,14 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
 
   override fun enterCreate(ctx: CreateContext) {
     val eText = ctx.entity().text
-    println(eText)
     entity = schema.find(eText)
 
-    stack.push(entity)
-    refID = ctx.data().processData() as RefID
+    selfStack.push(Pair(RefID(), entity))
+    refID = ctx.data().processData()
   }
 
-  private fun DataContext.processData(): Any {
-    val sEntity = stack.peek()
+  private fun DataContext.processData(): RefID {
+    val (refID, sEntity) = selfStack.peek()
     val inputs = entry().mapNotNull {
       val prop = it.ID().text
       val sProperty = sEntity.all[prop] ?: throw Exception("Property '$prop' not found in entity '${sEntity.name}.")
@@ -82,7 +84,7 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
             if (sProperty.type == RType.LINKED)
               throw Exception("Expecting typeOf (null, long, param) for '${sEntity.name}.$prop'.")
 
-            scope(sProperty.ref) { it.data().processData() }
+            scope(refID, RefID(), sProperty.ref) { it.data().processData() }
           }
           else -> null
         }
@@ -91,13 +93,13 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
     }.toMap()
 
     // check if all input properties are present
+    val completed = if (parentStack.isNotEmpty()) inputs.plus(sEntity.parent!! to parentStack.peek()) else inputs
     sEntity.all.values.filter { it.isInput }.forEach {
-      if (!inputs.containsKey(it))
+      if (!completed.containsKey(it))
         throw Exception("Expecting an input value for '${sEntity.name}:${it.name}'.")
     }
 
-    val refID = RefID()
-    tx.add(FcCreate(sEntity, refID, inputs))
+    tx.add(FcCreate(sEntity, refID, completed))
     return refID
   }
 
@@ -129,7 +131,7 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
         RType.OWNED -> {
           if (data() == null)
             throw Exception("Expecting a collection of objects for '${prop.entity!!.name}.${prop.name}'.")
-          scope(prop.ref) { data().map { it.processData() } }
+          scope(selfStack.peek().first, RefID(), prop.ref) { data().map { it.processData() } }
         }
 
         RType.LINKED -> {
@@ -157,12 +159,14 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
 
     LONG() != null -> {
       field.tryType(FType.LONG)
-      LONG().text.toLong()
+      val value = LONG().text
+      if (field.type == FType.INT) value.toInt() else value.toLong()
     }
 
     DOUBLE() != null -> {
       field.tryType(FType.DOUBLE)
-      DOUBLE().text.toDouble()
+      val value = DOUBLE().text
+      if (field.type == FType.FLOAT) value.toFloat() else value.toDouble()
     }
 
     BOOL() != null -> {

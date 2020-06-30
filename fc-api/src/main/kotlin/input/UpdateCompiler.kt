@@ -143,12 +143,14 @@ internal class UpdateCompiler(private val dsl: String, private val schema: FcSch
 
     LONG() != null -> {
       field.tryType(FType.LONG)
-      LONG().text.toLong()
+      val value = LONG().text
+      if (field.type == FType.INT) value.toInt() else value.toLong()
     }
 
     DOUBLE() != null -> {
       field.tryType(FType.DOUBLE)
-      DOUBLE().text.toDouble()
+      val value = DOUBLE().text
+      if (field.type == FType.FLOAT) value.toFloat() else value.toDouble()
     }
 
     BOOL() != null -> {

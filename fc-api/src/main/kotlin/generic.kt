@@ -11,7 +11,9 @@ class RefID(id: Long? = null) {
   var id: Long? = id
     internal set
 
-  override fun toString() = "RefID(id=$id)"
+  override fun toString() = hashCode().toString()
 }
 
-data class RefLink(val oper: OType, val refID: RefID)
+class RefLink(val oper: OType, val refID: RefID) {
+  override fun toString() = "RefLink(@${oper.name.toLowerCase()}, $refID)"
+}

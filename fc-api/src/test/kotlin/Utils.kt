@@ -5,6 +5,8 @@ import fc.api.query.IResult
 import fc.api.query.QTree
 import fc.api.spi.IAdaptor
 import fc.api.spi.InputInstructions
+import fc.api.EType.*
+import fc.api.FType.*
 
 open class TestAdaptor(override val schema: FcSchema) : IAdaptor {
   override fun changeSchema(updated: FcSchema) {
@@ -25,17 +27,30 @@ open class TestAdaptor(override val schema: FcSchema) : IAdaptor {
 }
 
 fun createCorrectSchema() = FcSchema {
-  entity("Simple", EType.MASTER) {
-    field("aText", FType.TEXT)
-    field("aInt", FType.INT)
-    field("aLong", FType.LONG)
-    field("aFloat", FType.FLOAT)
-    field("aDouble", FType.DOUBLE)
-    field("aBool", FType.BOOL)
-    field("aTime", FType.TIME)
-    field("aDate", FType.DATE)
-    field("aDateTime", FType.DATETIME)
-    field("aList", FType.LIST)
+  master("Simple") {
+    field("aText", TEXT)
+    field("aInt", INT)
+    field("aLong", LONG)
+    field("aFloat", FLOAT)
+    field("aDouble", DOUBLE)
+    field("aBool", BOOL)
+    field("aTime", TIME)
+    field("aDate", DATE)
+    field("aDateTime", DATETIME)
+    field("aList", LIST)
     // TODO: field("aMap", MAP)
+  }
+
+  val Country = master("Country") {
+    field("name", TEXT)
+    field("code", TEXT)
+  }
+
+  master("User") {
+    field("name", TEXT)
+    ownedRef("address", owned = detail("Address") {
+      field("city", TEXT)
+      linkedRef("country", Country)
+    })
   }
 }
