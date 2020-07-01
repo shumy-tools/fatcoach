@@ -11,10 +11,10 @@ update: entity '@id' '=' id=longOrParam data EOF ;
 
   data: '{' entry (',' entry)* '}' ;
 
-    entry: ID ':' ( data | oper | list | value ) ;
+    entry: ID ':' (oper | data | list | value) ;
 
-      oper: (add='@add' | del='@del') value ;
+      oper: (add='@add' | del='@del') (list | value) ;
 
-      list: '[' ((value (',' value)*) | (oper (',' oper)*) | (data (',' data)*)) ']' ;
+      list: '[' ((value (',' value)*) | (data (',' data)*)) ']' ;
 
       value: NULL | TEXT | LONG | DOUBLE | BOOL | TIME | DATE | DATETIME | PARAM ;

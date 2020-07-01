@@ -9,7 +9,7 @@ create: entity data EOF ;
 
   data: '{' entry (',' entry)* '}' ;
 
-    entry: ID ':' ( data | list | value ) ;
+    entry: ID ':' (data | list | value) ;
 
       list: '[' ((value (',' value)*) | (data (',' data)*)) ']' ;
 

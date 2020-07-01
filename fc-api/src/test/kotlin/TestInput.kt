@@ -9,7 +9,7 @@ import org.junit.FixMethodOrder
 import org.junit.Test
 
 class Checker(private val instructions: InputInstructions) {
-  private var next = 0
+  internal var next = 0
   fun check(value: String) {
     assert(instructions.all[next].toString() == value)
     next += 1
@@ -22,7 +22,18 @@ class TestInputAdaptor(override val schema: FcSchema) : TestAdaptor(schema) {
     session.set(instructions)
   }
 
-  fun checker(scope: Checker.() -> Unit) = Checker(session.get()).scope()
+  fun checker(scope: Checker.() -> Unit) {
+    val instructions = session.get()
+    val checker = Checker(instructions)
+    checker.scope()
+    val remaining = instructions.all.size - checker.next
+    assert(remaining == 0) {
+      """Check all available instructions! Remaining:
+        |${instructions.all.drop(instructions.all.size - remaining).joinToString("\n")}
+      """.trimMargin()
+    }
+  }
+
   fun print() = session.get().all.forEach(::println)
 }
 
@@ -109,9 +120,11 @@ class TestInput {
     adaptor.checker {
       check("FcInsert(Country) @id=$portugalID - {name=(String@Portugal), code=(String@PT)}")
       check("FcInsert(Country) @id=$spainID - {name=(String@Spain), code=(String@ES)}")
+
       check("FcInsert(User) @id=$userID - {name=(String@Alex), address=(RefID@$addressID)}")
       check("FcInsert(Address) @id=$addressID - {city=(String@Aveiro), country=(RefID@$portugalID), @parent=(RefID@$userID)}")
       check("FcUpdate(Address) @id=$addressID - {city=(String@Barcelona), country=(RefLink@(@add -> $spainID))}")
+
       check("FcUpdate(Address) @id=$addressID - {city=(String@None), country=(RefLink@(@del -> $spainID))}")
     }
   }
@@ -125,6 +138,7 @@ class TestInput {
     var roleID1: RefTree? = null
     var role1Det1: RefTree? = null
     var role1Det2: RefTree? = null
+    var role1AddDet: RefTree? = null
 
     var roleID2: RefTree? = null
     var role2Det1: RefTree? = null
@@ -151,6 +165,7 @@ class TestInput {
         url: "http://url-4"
       }""")
 
+      // setting individual parameters
       roleID1 = create("""Role {
         name: "role-name",
         details: [
@@ -162,6 +177,7 @@ class TestInput {
       role1Det1 = roleID1!!.find("details", 0)
       role1Det2 = roleID1!!.find("details", 1)
 
+      // setting lists of parameters
       roleID2 = create("""Role {
         name: "role-name",
         details: [
@@ -172,14 +188,30 @@ class TestInput {
 
       role2Det1 = roleID2!!.find("details", 0)
       role2Det2 = roleID2!!.find("details", 1)
+
+      // create RoleDetail via parent
+      role1AddDet = create("""RoleDetail {
+        @parent: ?parent,
+        name: "role-det-5",
+        active: true,
+        perms: ?perms
+      }""", "parent" to roleID1!!, "perms" to listOf(permID1, permID4))
+
+      update("""RoleDetail @id = ?id {
+        perms: @add ?perms
+      }""", "id" to role1AddDet!!, "perms" to listOf(permID2, permID3))
+
+      update("""RoleDetail @id = ?id {
+        perms: @del ?perms
+      }""", "id" to role1AddDet!!, "perms" to listOf(permID2, permID3))
     }
 
-    adaptor.print()
     adaptor.checker {
       check("FcInsert(Permission) @id=$permID1 - {name=(String@perm-1), url=(String@http://url-1)}")
       check("FcInsert(Permission) @id=$permID2 - {name=(String@perm-2), url=(String@http://url-2)}")
       check("FcInsert(Permission) @id=$permID3 - {name=(String@perm-3), url=(String@http://url-3)}")
       check("FcInsert(Permission) @id=$permID4 - {name=(String@perm-4), url=(String@http://url-4)}")
+
       check("FcInsert(Role) @id=$roleID1 - {name=(String@role-name), details=[(RefID@$role1Det1), (RefID@$role1Det2)]}")
       check("FcInsert(RoleDetail) @id=$role1Det1 - {name=(String@role-det-1), active=(Boolean@true), perms=[(RefID@$permID1), (RefID@$permID2)], @parent=(RefID@$roleID1)}")
       check("FcInsert(RoleDetail) @id=$role1Det2 - {name=(String@role-det-2), active=(Boolean@false), perms=[(RefID@$permID3), (RefID@$permID4)], @parent=(RefID@$roleID1)}")
@@ -187,6 +219,10 @@ class TestInput {
       check("FcInsert(Role) @id=$roleID2 - {name=(String@role-name), details=[(RefID@$role2Det1), (RefID@$role2Det2)]}")
       check("FcInsert(RoleDetail) @id=$role2Det1 - {name=(String@role-det-1), active=(Boolean@true), perms=[(RefID@$permID1), (RefID@$permID2)], @parent=(RefID@$roleID2)}")
       check("FcInsert(RoleDetail) @id=$role2Det2 - {name=(String@role-det-2), active=(Boolean@false), perms=[(RefID@$permID3), (RefID@$permID4)], @parent=(RefID@$roleID2)}")
+
+      check("FcInsert(RoleDetail) @id=$role1AddDet - {@parent=(RefID@$roleID1), name=(String@role-det-5), active=(Boolean@true), perms=[(RefID@$permID1), (RefID@$permID4)]}")
+      check("FcUpdate(RoleDetail) @id=$role1AddDet - {perms=[(RefLink@(@add -> $permID2)), (RefLink@(@add -> $permID3))]}")
+      check("FcUpdate(RoleDetail) @id=$role1AddDet - {perms=[(RefLink@(@del -> $permID2)), (RefLink@(@del -> $permID3))]}")
     }
   }
 }

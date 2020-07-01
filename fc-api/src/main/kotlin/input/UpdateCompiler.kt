@@ -11,9 +11,6 @@ import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ErrorNode
 import org.antlr.v4.runtime.tree.ParseTreeWalker
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.LocalTime
 
 internal class UpdateCompiler(private val dsl: String, private val schema: FcSchema, private val tx: InputInstructions, private val args: Map<String, Any>): UpdateBaseListener() {
   lateinit var refID: RefID
@@ -44,14 +41,10 @@ internal class UpdateCompiler(private val dsl: String, private val schema: FcSch
   override fun enterUpdate(ctx: UpdateContext) {
     val eText = ctx.entity().text
     entity = schema.find(eText)
+
     refID = if (ctx.id.LONG() != null) RefID(ctx.id.LONG().text.toLong()) else {
       val key = ctx.id.PARAM().text.substring(1)
-      val value = args[key] ?: throw Exception("Expecting an argument value for '${entity!!.name}.@id'.")
-      when (value) {
-        is RefID -> value
-        is RefTree -> value.root
-        else -> throw Exception("Expecting typeOf RefID for '${entity!!.name}.@id'.")
-      }
+      args.getRefID(key)
     }
 
     val inputs = ctx.data().processData(entity!!)
@@ -59,7 +52,7 @@ internal class UpdateCompiler(private val dsl: String, private val schema: FcSch
   }
 
   private fun DataContext.processData(sEntity: SEntity): Map<String, Any?> {
-    return entry().mapNotNull {
+    return entry().map {
       val prop = it.ID().text
       val sProperty = sEntity.all[prop] ?: throw Exception("Property '$prop' not found in entity '${sEntity.name}.")
 
@@ -67,34 +60,48 @@ internal class UpdateCompiler(private val dsl: String, private val schema: FcSch
       val value = if (sProperty.isInput) {
         accessed.add(sProperty)
         when {
-          it.value() != null -> it.value().processValue(sProperty)
+          it.value() != null -> ValueProxy(it.value(), args, true).process(sProperty)
           it.list() != null -> it.list().processList(sProperty)
 
           it.oper() != null -> {
-            if (sProperty !is SReference)
-              throw Exception("Invalid reference for '${sEntity.name}.$prop'.")
+            if (sProperty !is SRelation)
+              throw Exception("Unexpected operation (@add, @del) for field '${sEntity.name}.$prop'.")
 
-            val oper = if (it.oper().add != null) OType.ADD else OType.DEL
-            it.oper().value().processRefLink(oper, sProperty, sProperty.isOptional)
+            val oper = it.oper()
+            val operType = if (oper.add != null) OType.ADD else OType.DEL
+            when {
+              oper.value() != null -> {
+                val refs = ValueProxy(oper.value(), args, true).process(sProperty)
+                if (sProperty is SCollection) {
+                  (refs as List<*>).map { refID -> RefLink(operType, refID as RefID) }
+                } else {
+                  RefLink(operType, refs as RefID)
+                }
+              }
+
+              oper.list() != null -> {
+                if (sProperty !is SCollection)
+                  throw Exception("Unexpected list for field/reference '${sEntity.name}.$prop'.")
+
+                oper.list().processList(sProperty).map { refID -> RefLink(operType, refID as RefID) }
+              }
+
+              else -> throw Exception("Update bug - 1. Unrecognized dsl branch!")
+            }
           }
 
           it.data() != null -> {
             // TODO: process field MAP ?
             TODO()
           }
-          else -> null
+          else -> throw Exception("Update bug - 2. Unrecognized dsl branch!")
         }
-      } else null
+      } else throw Exception("Update bug - 3. Unrecognized dsl branch!")
+
       sProperty.name to value
     }.toMap()
-  }
 
-  private fun ValueContext.processValue(prop: SProperty): Any? {
-    return when (prop) {
-      is SField -> processField(prop)
-      is SReference -> throw Exception("Expecting an operation (@add | @del) for '${prop.entity!!.name}.${prop.name}'.")
-      is SCollection -> throw Exception("Expecting a collection for '${prop.entity!!.name}.${prop.name}'.")
-    }
+    // TODO: process derive fields ?
   }
 
   private fun ListContext.processList(prop: SProperty): List<Any?> {
@@ -103,7 +110,7 @@ internal class UpdateCompiler(private val dsl: String, private val schema: FcSch
         when (prop.type) {
           FType.LIST -> {
             val value = value() ?: throw Exception("Expecting a collection of values for '${prop.entity!!.name}.${prop.name}'.")
-            value.map { it.processField(prop) }
+            value.map { ValueProxy(it, args, true).processField(prop) }
           }
 
           // TODO: process field MAP ?
@@ -117,94 +124,13 @@ internal class UpdateCompiler(private val dsl: String, private val schema: FcSch
         RType.OWNED -> throw Exception("Updating an owned reference/collection is not supported. Update '${prop.entity!!.name}.${prop.name}' using the @parent field.")
 
         RType.LINKED -> {
-          if (oper() == null)
-            throw Exception("Expecting an operation (@add | @del) for '${prop.entity!!.name}.${prop.name}'.")
-          oper().map {
-            val oper = if (it.add != null) OType.ADD else OType.DEL
-            it.value().processRefLink(oper, prop, false)
-          }
+          if (value() == null)
+            throw Exception("Expecting a collection of references for '${prop.entity!!.name}.${prop.name}'.")
+          value().map { ValueProxy(it, args, true).processRefID(prop, false) }
         }
       }
 
       is SReference -> throw Exception("Expecting a reference for '${prop.entity!!.name}.${prop.name}'.")
-    }
-  }
-
-
-  private fun ValueContext.processField(field: SField): Any? = when {
-    NULL() != null -> {
-      if (!field.isOptional)
-        throw Exception("Expecting an input value for non-optional field '${field.entity!!.name}.${field.name}'.")
-      null
-    }
-
-    TEXT() != null -> {
-      field.tryType(FType.TEXT)
-      TEXT().text.substring(1, TEXT().text.length-1)
-    }
-
-    LONG() != null -> {
-      field.tryType(FType.LONG)
-      val value = LONG().text
-      if (field.type == FType.INT) value.toInt() else value.toLong()
-    }
-
-    DOUBLE() != null -> {
-      field.tryType(FType.DOUBLE)
-      val value = DOUBLE().text
-      if (field.type == FType.FLOAT) value.toFloat() else value.toDouble()
-    }
-
-    BOOL() != null -> {
-      field.tryType(FType.BOOL)
-      BOOL().text!!.toBoolean()
-    }
-
-    TIME() != null -> {
-      field.tryType(FType.TIME)
-      LocalTime.parse(TIME().text.substring(1))
-    }
-
-    DATE() != null -> {
-      field.tryType(FType.DATE)
-      LocalDate.parse(DATE().text.substring(1))
-    }
-
-    DATETIME() != null -> {
-      field.tryType(FType.DATETIME)
-      LocalDateTime.parse(DATETIME().text.substring(1))
-    }
-
-    PARAM() != null -> {
-      val key = PARAM().text.substring(1)
-      val value = args[key] ?: throw Exception("Expecting an argument value for '${field.entity!!.name}.${field.name}'.")
-      field.tryType(TypeEngine.convert(value.javaClass.kotlin))
-      value
-    }
-
-    else -> throw Exception("Expecting typeOf (null, text, long, double, bool, time, data, datetime, param) for '${field.entity!!.name}.${field.name}'.")
-  }
-
-  private fun ValueContext.processRefLink(oper: OType, ref: SRelation, isOptional: Boolean): RefLink {
-    if (ref.type == RType.OWNED)
-      throw Exception("Updating an owned reference/collection is not supported. Update '${ref.entity!!.name}.${ref.name}' using the @parent field.")
-
-    return when {
-      NULL() != null -> {
-        if (!isOptional)
-          throw Exception("Expecting an input value for non-optional reference '${ref.entity!!.name}.${ref.name}'.")
-        RefLink(oper, RefID())
-      }
-
-      LONG() != null -> RefLink(oper, RefID(LONG().text.toLong()))
-
-      PARAM() != null -> {
-        val key = PARAM().text.substring(1)
-        val refID = args.getRefID(key)
-        RefLink(oper, refID)
-      }
-
-      else -> throw Exception("Expecting typeOf (@add | @del) (null, long, param=RefID) for '${ref.entity!!.name}.${ref.name}'.")
     }
   }
 }
