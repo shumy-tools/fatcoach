@@ -200,13 +200,7 @@ internal class UpdateCompiler(private val dsl: String, private val schema: FcSch
 
       PARAM() != null -> {
         val key = PARAM().text.substring(1)
-        val value = args[key] ?: throw Exception("Expecting an argument value for '${ref.entity!!.name}.${ref.name}'.")
-        val refID = when (value) {
-          is RefID -> value
-          is RefTree -> value.root
-          else -> throw Exception("Expecting typeOf RefID for '${ref.entity!!.name}.${ref.name}'.")
-        }
-
+        val refID = args.getRefID(key)
         RefLink(oper, refID)
       }
 

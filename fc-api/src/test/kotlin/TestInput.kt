@@ -73,7 +73,7 @@ class TestInput {
     var spainID: RefTree? = null
 
     var userID: RefTree? = null
-    var addressID: RefID? = null
+    var addressID: RefTree? = null
     db.tx {
       portugalID = create("""Country {
         name: "Portugal",
@@ -106,7 +106,6 @@ class TestInput {
       }""", "id" to addressID!!, "country" to spainID!!)
     }
 
-    adaptor.print()
     adaptor.checker {
       check("FcInsert(Country) @id=$portugalID - {name=(String@Portugal), code=(String@PT)}")
       check("FcInsert(Country) @id=$spainID - {name=(String@Spain), code=(String@ES)}")
@@ -118,6 +117,76 @@ class TestInput {
   }
 
   @Test fun testCollections() {
+    var permID1: RefTree? = null
+    var permID2: RefTree? = null
+    var permID3: RefTree? = null
+    var permID4: RefTree? = null
 
+    var roleID1: RefTree? = null
+    var role1Det1: RefTree? = null
+    var role1Det2: RefTree? = null
+
+    var roleID2: RefTree? = null
+    var role2Det1: RefTree? = null
+    var role2Det2: RefTree? = null
+
+    db.tx {
+      permID1 = create("""Permission {
+        name: "perm-1",
+        url: "http://url-1"
+      }""")
+
+      permID2 = create("""Permission {
+        name: "perm-2",
+        url: "http://url-2"
+      }""")
+
+      permID3 = create("""Permission {
+        name: "perm-3",
+        url: "http://url-3"
+      }""")
+
+      permID4 = create("""Permission {
+        name: "perm-4",
+        url: "http://url-4"
+      }""")
+
+      roleID1 = create("""Role {
+        name: "role-name",
+        details: [
+          { name: "role-det-1", active: true, perms: [?perm1, ?perm2] },
+          { name: "role-det-2", active: false, perms: [?perm3, ?perm4] }
+        ]
+      }""", "perm1" to permID1!!, "perm2" to permID2!!, "perm3" to permID3!!, "perm4" to permID4!!)
+
+      role1Det1 = roleID1!!.find("details", 0)
+      role1Det2 = roleID1!!.find("details", 1)
+
+      roleID2 = create("""Role {
+        name: "role-name",
+        details: [
+          { name: "role-det-1", active: true, perms: ?perms1 },
+          { name: "role-det-2", active: false, perms: ?perms2 }
+        ]
+      }""", "perms1" to listOf(permID1, permID2), "perms2" to listOf(permID3, permID4))
+
+      role2Det1 = roleID2!!.find("details", 0)
+      role2Det2 = roleID2!!.find("details", 1)
+    }
+
+    adaptor.print()
+    adaptor.checker {
+      check("FcInsert(Permission) @id=$permID1 - {name=(String@perm-1), url=(String@http://url-1)}")
+      check("FcInsert(Permission) @id=$permID2 - {name=(String@perm-2), url=(String@http://url-2)}")
+      check("FcInsert(Permission) @id=$permID3 - {name=(String@perm-3), url=(String@http://url-3)}")
+      check("FcInsert(Permission) @id=$permID4 - {name=(String@perm-4), url=(String@http://url-4)}")
+      check("FcInsert(Role) @id=$roleID1 - {name=(String@role-name), details=[(RefID@$role1Det1), (RefID@$role1Det2)]}")
+      check("FcInsert(RoleDetail) @id=$role1Det1 - {name=(String@role-det-1), active=(Boolean@true), perms=[(RefID@$permID1), (RefID@$permID2)], @parent=(RefID@$roleID1)}")
+      check("FcInsert(RoleDetail) @id=$role1Det2 - {name=(String@role-det-2), active=(Boolean@false), perms=[(RefID@$permID3), (RefID@$permID4)], @parent=(RefID@$roleID1)}")
+
+      check("FcInsert(Role) @id=$roleID2 - {name=(String@role-name), details=[(RefID@$role2Det1), (RefID@$role2Det2)]}")
+      check("FcInsert(RoleDetail) @id=$role2Det1 - {name=(String@role-det-1), active=(Boolean@true), perms=[(RefID@$permID1), (RefID@$permID2)], @parent=(RefID@$roleID2)}")
+      check("FcInsert(RoleDetail) @id=$role2Det2 - {name=(String@role-det-2), active=(Boolean@false), perms=[(RefID@$permID3), (RefID@$permID4)], @parent=(RefID@$roleID2)}")
+    }
   }
 }

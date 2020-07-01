@@ -111,7 +111,14 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
     return when (prop) {
       is SField -> processField(prop)
       is SReference -> processRefID(prop, prop.isOptional)
-      is SCollection -> throw Exception("Expecting a collection for '${prop.entity!!.name}.${prop.name}'.")
+      is SCollection -> {
+        val param = PARAM()
+        if (param != null) {
+          val key = param.text.substring(1)
+          args.getRefIDList(key)
+        } else
+          throw Exception("Expecting a collection or a parameter for '${prop.entity!!.name}.${prop.name}'.")
+      }
     }
   }
 
@@ -220,12 +227,7 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
 
       PARAM() != null -> {
         val key = PARAM().text.substring(1)
-        val value = args[key] ?: throw Exception("Expecting an argument value for '${ref.entity!!.name}.${ref.name}'.")
-        when (value) {
-          is RefID -> value
-          is RefTree -> value.root
-          else -> throw Exception("Expecting typeOf RefID for '${ref.entity!!.name}.${ref.name}'.")
-        }
+        args.getRefID(key)
       }
 
       else -> throw Exception("Expecting typeOf (null, long, param=RefID) for '${ref.entity!!.name}.${ref.name}'.")

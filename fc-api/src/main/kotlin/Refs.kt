@@ -17,7 +17,7 @@ class RefTree {
   private val refs = linkedMapOf<String, RefTree>()
   private val cols = linkedMapOf<String, MutableList<RefTree>>()
 
-  fun find(path: String): RefID? {
+  fun find(path: String): RefTree? {
     val splits = path.split(".")
     var tree: RefTree? = this
     for (level in splits) {
@@ -25,10 +25,10 @@ class RefTree {
       tree = tree.refs[level]
     }
 
-    return tree!!.root
+    return tree!!
   }
 
-  fun find(path: String, index: Int): RefID? {
+  fun find(path: String, index: Int): RefTree? {
     val splits = path.split(".")
     var tree: RefTree? = this
     for (level in splits.dropLast(1)) {
@@ -37,7 +37,7 @@ class RefTree {
     }
 
     val last = tree!!.cols[splits.last()] ?: return null
-    return last[index].root
+    return last[index]
   }
 
   internal fun pushRef(prop: String): RefTree {

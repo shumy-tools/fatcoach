@@ -27,6 +27,7 @@ open class TestAdaptor(override val schema: FcSchema) : IAdaptor {
 }
 
 fun createCorrectSchema() = FcSchema {
+  /* -------------- simple fields -------------- */
   master("Simple") {
     field("aText", TEXT)
     field("aInt", INT)
@@ -41,6 +42,7 @@ fun createCorrectSchema() = FcSchema {
     // TODO: field("aMap", MAP)
   }
 
+  /* -------------- owned/linked refs -------------- */
   val Country = master("Country") {
     field("name", TEXT)
     field("code", TEXT)
@@ -51,6 +53,21 @@ fun createCorrectSchema() = FcSchema {
     ownedRef("address", owned = detail("Address") {
       field("city", TEXT)
       linkedRef("country", Country)
+    })
+  }
+
+  /* -------------- owned/linked cols -------------- */
+  val Permission = master("Permission") {
+    field("name", TEXT)
+    field("url", TEXT)
+  }
+
+  master("Role") {
+    field("name", TEXT)
+    ownedCol("details", owned = detail("RoleDetail") {
+      field("name", TEXT)
+      field("active", BOOL)
+      linkedCol("perms", Permission)
     })
   }
 }
