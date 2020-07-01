@@ -47,16 +47,18 @@ internal class UpdateCompiler(private val dsl: String, private val schema: FcSch
     refID = if (ctx.id.LONG() != null) RefID(ctx.id.LONG().text.toLong()) else {
       val key = ctx.id.PARAM().text.substring(1)
       val value = args[key] ?: throw Exception("Expecting an argument value for '${entity!!.name}.@id'.")
-      if (value !is RefID)
-        throw Exception("Expecting typeOf RefID for '${entity!!.name}.@id'.")
-      value
+      when (value) {
+        is RefID -> value
+        is RefTree -> value.root
+        else -> throw Exception("Expecting typeOf RefID for '${entity!!.name}.@id'.")
+      }
     }
 
     val inputs = ctx.data().processData(entity!!)
     tx.add(FcUpdate(entity, refID, inputs))
   }
 
-  private fun DataContext.processData(sEntity: SEntity): Map<SProperty, Any?> {
+  private fun DataContext.processData(sEntity: SEntity): Map<String, Any?> {
     return entry().mapNotNull {
       val prop = it.ID().text
       val sProperty = sEntity.all[prop] ?: throw Exception("Property '$prop' not found in entity '${sEntity.name}.")
@@ -83,7 +85,7 @@ internal class UpdateCompiler(private val dsl: String, private val schema: FcSch
           else -> null
         }
       } else null
-      sProperty to value
+      sProperty.name to value
     }.toMap()
   }
 
@@ -199,9 +201,13 @@ internal class UpdateCompiler(private val dsl: String, private val schema: FcSch
       PARAM() != null -> {
         val key = PARAM().text.substring(1)
         val value = args[key] ?: throw Exception("Expecting an argument value for '${ref.entity!!.name}.${ref.name}'.")
-        if (value !is RefID)
-          throw Exception("Expecting typeOf RefID for '${ref.entity!!.name}.${ref.name}'.")
-        RefLink(oper, value)
+        val refID = when (value) {
+          is RefID -> value
+          is RefTree -> value.root
+          else -> throw Exception("Expecting typeOf RefID for '${ref.entity!!.name}.${ref.name}'.")
+        }
+
+        RefLink(oper, refID)
       }
 
       else -> throw Exception("Expecting typeOf (@add | @del) (null, long, param=RefID) for '${ref.entity!!.name}.${ref.name}'.")

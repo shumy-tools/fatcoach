@@ -3,7 +3,7 @@ grammar Create;
 
 import Common;
 
-create: entity data ;
+create: entity data EOF ;
 
   entity: (ID '.')* NAME ;
 

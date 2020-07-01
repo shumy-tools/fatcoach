@@ -199,6 +199,10 @@ internal class QueryCompiler(private val dsl: String, private val schema: FcSche
     val compType = compType(comp().text)
     val qParam = param().parse()
 
+    // check if qParam type is compatible with end
+    if (qParam != null)
+      end.tryType(TypeEngine.convert(qParam.javaClass.kotlin))
+
     if (qParam is Parameter)
       addParameter(QParameter(qParam.value, end.type))
 

@@ -3,7 +3,7 @@ grammar Update;
 
 import Common;
 
-update: entity '@id' '=' id=longOrParam data ;
+update: entity '@id' '=' id=longOrParam data EOF ;
 
   entity: (ID '.')* NAME ;
 

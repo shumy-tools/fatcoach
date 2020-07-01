@@ -17,8 +17,7 @@ import java.time.LocalTime
 import java.util.*
 
 internal class CreateCompiler(private val dsl: String, private val schema: FcSchema, private val tx: InputInstructions, private val args: Map<String, Any>): CreateBaseListener() {
-  lateinit var refID: RefID
-    internal set
+  val tree = RefTree()
 
   lateinit var entity: SEntity
     internal set
@@ -26,17 +25,18 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
   val accessed = mutableSetOf<SProperty>()
   val errors = mutableListOf<String>()
 
-  private val parentStack = Stack<RefID>()
-  private val selfStack = Stack<Pair<RefID, SEntity>>()
+  private val parentStack = Stack<RefTree>()
+  private val selfStack = Stack<Pair<RefTree, SEntity>>()
   init { compile() }
 
-  private fun <R: Any> scope(parent: RefID, selfID: RefID, self: SEntity, scope: () -> R): R {
+  private fun scope(parent: RefTree, rel: SRelation, scope: () -> Unit): RefID {
+    val selfTree = if (rel is SReference) parent.pushRef(rel.name) else parent.pushCol(rel.name)
     parentStack.push(parent)
-    selfStack.push(Pair(selfID, self))
-      val result = scope()
+    selfStack.push(Pair(selfTree, rel.ref))
+      scope()
     selfStack.pop()
     parentStack.pop()
-    return result
+    return selfTree.root
   }
 
   private fun compile() {
@@ -59,15 +59,18 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
     val eText = ctx.entity().text
     entity = schema.find(eText)
 
-    selfStack.push(Pair(RefID(), entity))
-    refID = ctx.data().processData()
+    selfStack.push(Pair(tree, entity))
+    ctx.data().processData()
   }
 
-  private fun DataContext.processData(): RefID {
-    val (refID, sEntity) = selfStack.peek()
+  private fun DataContext.processData() {
+    val (selfTree, self) = selfStack.peek()
+    val fcCreate = FcCreate(self, selfTree.root)
+    tx.add(fcCreate)
+
     val inputs = entry().mapNotNull {
       val prop = it.ID().text
-      val sProperty = sEntity.all[prop] ?: throw Exception("Property '$prop' not found in entity '${sEntity.name}.")
+      val sProperty = self.all[prop] ?: throw Exception("Property '$prop' not found in entity '${self.name}.")
 
       // parse input properties
       val value = if (sProperty.isInput) {
@@ -79,28 +82,29 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
             // TODO: process field MAP ?
 
             if (sProperty !is SReference)
-              throw Exception("Invalid reference for '${sEntity.name}.$prop'.")
+              throw Exception("Invalid reference for '${self.name}.$prop'.")
 
             if (sProperty.type == RType.LINKED)
-              throw Exception("Expecting typeOf (null, long, param) for '${sEntity.name}.$prop'.")
+              throw Exception("Expecting typeOf (null, long, param) for '${self.name}.$prop'.")
 
-            scope(refID, RefID(), sProperty.ref) { it.data().processData() }
+            scope(selfTree, sProperty) { it.data().processData() }
           }
           else -> null
         }
       } else null
-      sProperty to value
+      sProperty.name to value
     }.toMap()
 
     // check if all input properties are present
-    val completed = if (parentStack.isNotEmpty()) inputs.plus(sEntity.parent!! to parentStack.peek()) else inputs
-    sEntity.all.values.filter { it.isInput }.forEach {
-      if (!completed.containsKey(it))
-        throw Exception("Expecting an input value for '${sEntity.name}:${it.name}'.")
+    val completed = if (parentStack.isNotEmpty()) inputs.plus(self.parent!!.name to parentStack.peek().root) else inputs
+    self.all.values.filter { it.isInput }.forEach {
+      if (!completed.containsKey(it.name))
+        throw Exception("Expecting an input value for '${self.name}:${it.name}'.")
     }
 
-    tx.add(FcCreate(sEntity, refID, completed))
-    return refID
+    // TODO: process derive fields
+
+    fcCreate.values = completed
   }
 
   private fun ValueContext.processValue(prop: SProperty): Any? {
@@ -131,7 +135,9 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
         RType.OWNED -> {
           if (data() == null)
             throw Exception("Expecting a collection of objects for '${prop.entity!!.name}.${prop.name}'.")
-          scope(selfStack.peek().first, RefID(), prop.ref) { data().map { it.processData() } }
+
+          val selfTree = selfStack.peek().first
+          data().map { scope(selfTree, prop) { it.processData() } }
         }
 
         RType.LINKED -> {
@@ -215,9 +221,11 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
       PARAM() != null -> {
         val key = PARAM().text.substring(1)
         val value = args[key] ?: throw Exception("Expecting an argument value for '${ref.entity!!.name}.${ref.name}'.")
-        if (value !is RefID)
-          throw Exception("Expecting typeOf RefID for '${ref.entity!!.name}.${ref.name}'.")
-        value
+        when (value) {
+          is RefID -> value
+          is RefTree -> value.root
+          else -> throw Exception("Expecting typeOf RefID for '${ref.entity!!.name}.${ref.name}'.")
+        }
       }
 
       else -> throw Exception("Expecting typeOf (null, long, param=RefID) for '${ref.entity!!.name}.${ref.name}'.")

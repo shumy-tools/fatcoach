@@ -3,6 +3,7 @@ package fc.test
 import fc.api.FcDatabase
 import fc.api.FcSchema
 import fc.api.RefID
+import fc.api.RefTree
 import fc.api.spi.InputInstructions
 import org.junit.FixMethodOrder
 import org.junit.Test
@@ -31,8 +32,8 @@ class TestInput {
   private val adaptor = TestInputAdaptor(schema)
   private val db = FcDatabase(adaptor)
 
-  @Test fun testSimple() {
-    var id: RefID? = null
+  @Test fun testFieldTypes() {
+    var id: RefTree? = null
     db.tx {
       id = create("""Simple {
         aText: "newText",
@@ -44,8 +45,8 @@ class TestInput {
         aTime: #15:10:30,
         aDate: #2020-10-25,
         aDateTime: #2020-10-25T15:10:30,
-        aList: [1, "2"] }
-      """)
+        aList: [1, "2"]
+      }""")
 
       update("""Simple @id = ?id {
         aText: "updatedText",
@@ -57,7 +58,8 @@ class TestInput {
         aTime: #13:10:30,
         aDate: #2019-10-25,
         aDateTime: #2019-10-25T13:10:30,
-        aList: [10, "20"] } } """, "id" to id!!)
+        aList: [10, "20"]
+      }""", "id" to id!!)
     }
 
     adaptor.checker {
@@ -66,13 +68,21 @@ class TestInput {
     }
   }
 
-  @Test fun testUser() {
-    var countryID: RefID? = null
-    var userID: RefID? = null
+  @Test fun testReferences() {
+    var portugalID: RefTree? = null
+    var spainID: RefTree? = null
+
+    var userID: RefTree? = null
+    var addressID: RefID? = null
     db.tx {
-      countryID = create("""Country {
+      portugalID = create("""Country {
         name: "Portugal",
         code: "PT"
+      }""")
+
+      spainID = create("""Country {
+        name: "Spain",
+        code: "ES"
       }""")
 
       userID = create("""User {
@@ -81,14 +91,33 @@ class TestInput {
           city: "Aveiro",
           country: ?country
         }
-      }""", "country" to countryID!!)
+      }""", "country" to portugalID!!)
+
+      addressID = userID!!.find("address")
+
+      update("""Address @id = ?id {
+        city: "Barcelona",
+        country: @add ?country
+      }""", "id" to addressID!!, "country" to spainID!!)
+
+      update("""Address @id = ?id {
+        city: "None",
+        country: @del ?country
+      }""", "id" to addressID!!, "country" to spainID!!)
     }
 
     adaptor.print()
     adaptor.checker {
-      check("FcInsert(Country) @id=$countryID - {name=(String@Portugal), code=(String@PT)}")
-      check("FcInsert(Address) @id=RefID(786712380) - {city=(String@Aveiro), country=(RefID@$countryID), @parent=(RefID@RefID(1926240119))}")
-      check("FcInsert(User) @id=$userID - {name=(String@Alex), address=(RefID@RefID(786712380))}")
+      check("FcInsert(Country) @id=$portugalID - {name=(String@Portugal), code=(String@PT)}")
+      check("FcInsert(Country) @id=$spainID - {name=(String@Spain), code=(String@ES)}")
+      check("FcInsert(User) @id=$userID - {name=(String@Alex), address=(RefID@$addressID)}")
+      check("FcInsert(Address) @id=$addressID - {city=(String@Aveiro), country=(RefID@$portugalID), @parent=(RefID@$userID)}")
+      check("FcUpdate(Address) @id=$addressID - {city=(String@Barcelona), country=(RefLink@(@add -> $spainID))}")
+      check("FcUpdate(Address) @id=$addressID - {city=(String@None), country=(RefLink@(@del -> $spainID))}")
     }
+  }
+
+  @Test fun testCollections() {
+
   }
 }
