@@ -14,9 +14,7 @@ class FcTxData internal constructor(private val schema: FcSchema) {
     if (compiled.errors.isNotEmpty())
       throw Exception("Failed to compile create! ${compiled.errors}")
 
-    // TODO: check security on accessed properties?
     // TODO: compute derived values
-
     return compiled.tree
   }
 
@@ -26,7 +24,6 @@ class FcTxData internal constructor(private val schema: FcSchema) {
     if (compiled.errors.isNotEmpty())
       throw Exception("Failed to compile update! ${compiled.errors}")
 
-    // TODO: check security on accessed properties?
     // TODO: compute derived values
   }
 
@@ -35,7 +32,5 @@ class FcTxData internal constructor(private val schema: FcSchema) {
     val compiled = DeleteCompiler(dsl, schema, tx, arg)
     if (compiled.errors.isNotEmpty())
       throw Exception("Failed to compile delete! ${compiled.errors}")
-
-    // TODO: check security on accessed properties?
   }
 }

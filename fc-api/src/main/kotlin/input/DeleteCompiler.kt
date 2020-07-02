@@ -15,10 +15,7 @@ import org.antlr.v4.runtime.tree.ErrorNode
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 
 internal class DeleteCompiler(private val dsl: String, private val schema: FcSchema, private val tx: InputInstructions, private val arg: RefID?): DeleteBaseListener() {
-  lateinit var entity: SEntity
-  lateinit var refID: RefID
   val errors = mutableListOf<String>()
-
   init { compile() }
 
   private fun compile() {
@@ -37,11 +34,13 @@ internal class DeleteCompiler(private val dsl: String, private val schema: FcSch
 
   override fun enterDelete(ctx: DeleteContext) {
     val eText = ctx.entity().text
-    entity = schema.find(eText)
-    refID = if (ctx.id.LONG() != null) RefID(ctx.id.LONG().text.toLong()) else {
+    val entity = schema.find(eText)
+    val refID = if (ctx.id.LONG() != null) RefID(ctx.id.LONG().text.toLong()) else {
       arg ?: throw Exception("Expecting an argument value for '${entity.name}.@id'.")
     }
 
-    tx.add(FcDelete(entity, refID))
+    val fcDelete = FcDelete(entity, refID)
+    fcDelete.accessed.add(entity.id)
+    tx.add(fcDelete)
   }
 }

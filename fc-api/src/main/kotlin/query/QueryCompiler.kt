@@ -64,6 +64,8 @@ internal class QueryCompiler(private val dsl: String, private val schema: FcSche
   }
 
   private fun QlineContext.processQLine(isReference: Boolean = false): QRelation {
+    accessed.add(stack.peek().id)
+
     val fields = select().fields().processFields()
     val relations = select().relation().processRelations()
 
@@ -124,7 +126,7 @@ internal class QueryCompiler(private val dsl: String, private val schema: FcSche
     } else {
       field().map {
         val prop = it.ID().text
-        val field = sEntity.fields[prop] ?: throw Exception("Invalid field '${sEntity.name}.$prop'.")
+        val field = sEntity.fields[prop] ?: if (prop == SID) sEntity.id else throw Exception("Invalid field '${sEntity.name}.$prop'.")
         accessed.add(field)
 
         val sortType = sortType(it.order()?.text)
@@ -170,7 +172,7 @@ internal class QueryCompiler(private val dsl: String, private val schema: FcSche
     val path = mutableListOf<SProperty>()
     full.forEachIndexed { index, it ->
       val prop = it.text
-      val sProperty = ctx.all[prop]
+      val sProperty = ctx.all[prop] ?: if (prop == SID) ctx.id else null
 
       // first and middle token requires a SRelation
       if (index < full.size - 1 && sProperty !is SRelation) {
@@ -180,7 +182,7 @@ internal class QueryCompiler(private val dsl: String, private val schema: FcSche
 
       // last token requires a SField
       if (index == full.size - 1 && sProperty !is SField) {
-        val oneOf = ctx.fields.map { it.key }
+        val oneOf = listOf(SID).plus(ctx.fields.map { it.key })
         throw Exception("Invalid path termination '${ctx.name}:$prop'. Please complete the path with one of $oneOf")
       }
 
@@ -195,24 +197,18 @@ internal class QueryCompiler(private val dsl: String, private val schema: FcSche
     // path termination is already checked, this is a SField
     val end = path.last() as SField
 
-    // process comparator and parameter
+    // process comparator and parameters
     val compType = compType(comp().text)
     val qParam = param().parse()
+    val params = end.processParameter(qParam)
+    return QPredicate(start, path, end, compType, params)
+  }
 
-    // check if qParam type is compatible with end
-    if (qParam != null)
-      end.tryType(TypeEngine.convert(qParam.javaClass.kotlin))
-
-    if (qParam is Parameter)
-      addParameter(QParameter(qParam.value, end.type))
-
-    if (qParam is List<*>)
-      qParam.forEach {
-        if (it is Parameter)
-          addParameter(QParameter(it.value, end.type))
-      }
-
-    return QPredicate(start, path, end, compType, qParam)
+  private fun SField.processParameter(qParam: Any?): Any? = when {
+    qParam is Parameter -> addParameter(QParameter(qParam.value, type))
+    qParam is List<*> -> qParam.map { processParameter(it) }
+    qParam != null -> { tryType(TypeEngine.convert(qParam.javaClass.kotlin)); qParam }
+    else -> null
   }
 }
 

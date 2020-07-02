@@ -3,7 +3,7 @@ grammar Delete;
 
 import Common;
 
-delete: entity '@id' '=' id=longOrParam EOF ;
+delete: entity '@id' '==' id=longOrParam EOF ;
 
   longOrParam: (LONG | PARAM) ;
 

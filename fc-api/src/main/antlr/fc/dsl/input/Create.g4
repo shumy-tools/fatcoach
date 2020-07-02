@@ -7,10 +7,12 @@ create: entity data EOF ;
 
   entity: (ID '.')* NAME ;
 
-  data: '{' entry (',' entry)* '}' ;
+  data: '{' (entry (',' entry)*)? '}' ;
 
     entry: ID ':' (data | list | value) ;
 
-      list: '[' ((value (',' value)*) | (data (',' data)*)) ']' ;
+      list: '[' (item (',' item)*)? ']' ;
+
+      item: value | data ;
 
       value: NULL | TEXT | LONG | DOUBLE | BOOL | TIME | DATE | DATETIME | PARAM ;

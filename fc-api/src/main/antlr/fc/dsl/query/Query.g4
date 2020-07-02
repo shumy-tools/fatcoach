@@ -25,7 +25,7 @@ qline: filter? (limit page?)? select ;
 
       param: value | list ;
 
-        list: '[' value (',' value)* ']';
+        list: '[' (value (',' value)*)? ']';
 
         value: NULL | TEXT | LONG | DOUBLE | BOOL | TIME | DATE | DATETIME | PARAM ;
 

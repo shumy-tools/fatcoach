@@ -28,8 +28,10 @@ object TypeEngine {
     put(List::class, FType.LIST)
   }
 
+  private val oneOf = classToType.values.map { it.name.toLowerCase() }
+
   fun convert(vType: KClass<Any>): FType = classToType[vType] ?:
-    throw Exception("Unrecognized type, expecting one of typeOf (null, text, long, double, bool, time, data, datetime, list, map)")
+    throw Exception("Expecting type one of $oneOf. Found ${vType.simpleName}.")
 
   fun check(fType: FType, vType: KClass<Any>): Boolean {
     return fType == classToType[vType]

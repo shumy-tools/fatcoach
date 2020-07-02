@@ -8,7 +8,7 @@ import fc.api.spi.InputInstructions
 import org.junit.FixMethodOrder
 import org.junit.Test
 
-class Checker(private val instructions: InputInstructions) {
+private class InputChecker(private val instructions: InputInstructions) {
   internal var next = 0
   fun check(value: String) {
     assert(instructions.all[next].toString() == value)
@@ -16,15 +16,15 @@ class Checker(private val instructions: InputInstructions) {
   }
 }
 
-class TestInputAdaptor(override val schema: FcSchema) : TestAdaptor(schema) {
+private class TestInputAdaptor(override val schema: FcSchema) : TestAdaptor(schema) {
   private val session = ThreadLocal<InputInstructions>()
   override fun execInput(instructions: InputInstructions) {
     session.set(instructions)
   }
 
-  fun checker(scope: Checker.() -> Unit) {
+  fun checker(scope: InputChecker.() -> Unit) {
     val instructions = session.get()
-    val checker = Checker(instructions)
+    val checker = InputChecker(instructions)
     checker.scope()
     val remaining = instructions.all.size - checker.next
     assert(remaining == 0) {
@@ -45,6 +45,9 @@ class TestInput {
 
   @Test fun testFieldTypes() {
     var id: RefTree? = null
+    var complexID1: RefTree? = null
+    var complexID2: RefTree? = null
+
     db.tx {
       id = create("""Simple {
         aText: "newText",
@@ -56,10 +59,11 @@ class TestInput {
         aTime: #15:10:30,
         aDate: #2020-10-25,
         aDateTime: #2020-10-25T15:10:30,
-        aList: [1, "2"]
+        aList: [1, "2"],
+        aMap: { one: 1, two: 2 }
       }""")
 
-      update("""Simple @id = ?id {
+      update("""Simple @id == ?id {
         aText: "updatedText",
         aInt: 100,
         aLong: 200,
@@ -69,13 +73,26 @@ class TestInput {
         aTime: #13:10:30,
         aDate: #2019-10-25,
         aDateTime: #2019-10-25T13:10:30,
-        aList: [10, "20"]
+        aList: [10, "20"],
+        aMap: { one-u: 10, two-u: 20 }
       }""", "id" to id!!)
+
+      complexID1 = create("""ComplexJSON {
+        aList: [ 1, 1.2, false, #15:10:30, #2020-10-25, #2020-10-25T15:10:30, { one: 1, two: 2 } ],
+        aMap: { }
+      }""")
+
+      complexID2 = create("""ComplexJSON {
+        aList: [ ],
+        aMap: { long: 1, double: 1.2, bool: false, time: #15:10:30, date: #2020-10-25, dt: #2020-10-25T15:10:30, list: [ 1, 2 ] }
+      }""")
     }
 
     adaptor.checker {
-      check("FcInsert(Simple) @id=$id - {aText=(String@newText), aInt=(Int@10), aLong=(Long@20), aFloat=(Float@10.0), aDouble=(Double@20.0), aBool=(Boolean@true), aTime=(LocalTime@15:10:30), aDate=(LocalDate@2020-10-25), aDateTime=(LocalDateTime@2020-10-25T15:10:30), aList=[(Long@1), (String@2)]}")
-      check("FcUpdate(Simple) @id=$id - {aText=(String@updatedText), aInt=(Int@100), aLong=(Long@200), aFloat=(Float@100.0), aDouble=(Double@200.0), aBool=(Boolean@false), aTime=(LocalTime@13:10:30), aDate=(LocalDate@2019-10-25), aDateTime=(LocalDateTime@2019-10-25T13:10:30), aList=[(Long@10), (String@20)]}")
+      check("FcInsert(Simple) @id=$id - {aText=(String@newText), aInt=(Int@10), aLong=(Long@20), aFloat=(Float@10.0), aDouble=(Double@20.0), aBool=(Boolean@true), aTime=(LocalTime@15:10:30), aDate=(LocalDate@2020-10-25), aDateTime=(LocalDateTime@2020-10-25T15:10:30), aList=[(Long@1), (String@2)], aMap={one=(Long@1), two=(Long@2)}}")
+      check("FcUpdate(Simple) @id=$id - {aText=(String@updatedText), aInt=(Int@100), aLong=(Long@200), aFloat=(Float@100.0), aDouble=(Double@200.0), aBool=(Boolean@false), aTime=(LocalTime@13:10:30), aDate=(LocalDate@2019-10-25), aDateTime=(LocalDateTime@2019-10-25T13:10:30), aList=[(Long@10), (String@20)], aMap={one-u=(Long@10), two-u=(Long@20)}}")
+      check("FcInsert(ComplexJSON) @id=$complexID1 - {aList=[(Long@1), (Double@1.2), (Boolean@false), (LocalTime@15:10:30), (LocalDate@2020-10-25), (LocalDateTime@2020-10-25T15:10:30), {one=(Long@1), two=(Long@2)}], aMap={}}")
+      check("FcInsert(ComplexJSON) @id=$complexID2 - {aList=[], aMap={long=(Long@1), double=(Double@1.2), bool=(Boolean@false), time=(LocalTime@15:10:30), date=(LocalDate@2020-10-25), dt=(LocalDateTime@2020-10-25T15:10:30), list=[(Long@1), (Long@2)]}}")
     }
   }
 
@@ -106,15 +123,17 @@ class TestInput {
 
       addressID = userID!!.find("address")
 
-      update("""Address @id = ?id {
+      update("""Address @id == ?id {
         city: "Barcelona",
         country: @add ?country
       }""", "id" to addressID!!, "country" to spainID!!)
 
-      update("""Address @id = ?id {
+      update("""Address @id == ?id {
         city: "None",
         country: @del ?country
       }""", "id" to addressID!!, "country" to spainID!!)
+
+      delete("Country @id == ?id", portugalID!!)
     }
 
     adaptor.checker {
@@ -123,9 +142,11 @@ class TestInput {
 
       check("FcInsert(User) @id=$userID - {name=(String@Alex), address=(RefID@$addressID)}")
       check("FcInsert(Address) @id=$addressID - {city=(String@Aveiro), country=(RefID@$portugalID), @parent=(RefID@$userID)}")
-      check("FcUpdate(Address) @id=$addressID - {city=(String@Barcelona), country=(RefLink@(@add -> $spainID))}")
 
+      check("FcUpdate(Address) @id=$addressID - {city=(String@Barcelona), country=(RefLink@(@add -> $spainID))}")
       check("FcUpdate(Address) @id=$addressID - {city=(String@None), country=(RefLink@(@del -> $spainID))}")
+
+      check("FcDelete(Country) @id=$portugalID")
     }
   }
 
@@ -197,11 +218,11 @@ class TestInput {
         perms: ?perms
       }""", "parent" to roleID1!!, "perms" to listOf(permID1, permID4))
 
-      update("""RoleDetail @id = ?id {
+      update("""RoleDetail @id == ?id {
         perms: @add ?perms
       }""", "id" to role1AddDet!!, "perms" to listOf(permID2, permID3))
 
-      update("""RoleDetail @id = ?id {
+      update("""RoleDetail @id == ?id {
         perms: @del ?perms
       }""", "id" to role1AddDet!!, "perms" to listOf(permID2, permID3))
     }

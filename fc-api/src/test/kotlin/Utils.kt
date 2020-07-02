@@ -5,7 +5,6 @@ import fc.api.query.IResult
 import fc.api.query.QTree
 import fc.api.spi.IAdaptor
 import fc.api.spi.InputInstructions
-import fc.api.EType.*
 import fc.api.FType.*
 
 open class TestAdaptor(override val schema: FcSchema) : IAdaptor {
@@ -27,7 +26,7 @@ open class TestAdaptor(override val schema: FcSchema) : IAdaptor {
 }
 
 fun createCorrectSchema() = FcSchema {
-  /* -------------- simple fields -------------- */
+  /* -------------- fields -------------- */
   master("Simple") {
     field("aText", TEXT)
     field("aInt", INT)
@@ -39,7 +38,12 @@ fun createCorrectSchema() = FcSchema {
     field("aDate", DATE)
     field("aDateTime", DATETIME)
     field("aList", LIST)
-    // TODO: field("aMap", MAP)
+    field("aMap", MAP)
+  }
+
+  master("ComplexJSON") {
+    field("aList", LIST)
+    field("aMap", MAP)
   }
 
   /* -------------- owned/linked refs -------------- */

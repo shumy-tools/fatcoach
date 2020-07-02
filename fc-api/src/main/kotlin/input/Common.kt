@@ -8,45 +8,20 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 
-class ValueProxy {
+class FieldProxy {
   private val ctx: Any
   private val _isUpdate: Boolean
   private val _args: Map<String, Any>
-
-  private val aNull: TerminalNode?
-  private val aText: TerminalNode?
-  private val aLong: TerminalNode?
-  private val aDouble: TerminalNode?
-  private val aBool: TerminalNode?
-  private val aTime: TerminalNode?
-  private val aDate: TerminalNode?
-  private val aDateTime: TerminalNode?
-  private val aParam: TerminalNode?
+  private val tValue: ValueProxy
 
   constructor(value: CreateParser.ValueContext, args: Map<String, Any>, isUpdate: Boolean) {
     ctx = value; _args = args; _isUpdate = isUpdate
-    aNull = ctx.NULL()
-    aText = ctx.TEXT()
-    aLong = ctx.LONG()
-    aDouble = ctx.DOUBLE()
-    aBool = ctx.BOOL()
-    aTime = ctx.TIME()
-    aDate = ctx.DATE()
-    aDateTime = ctx.DATETIME()
-    aParam = ctx.PARAM()
+    tValue = ValueProxy(value)
   }
 
   constructor(value: UpdateParser.ValueContext, args: Map<String, Any>, isUpdate: Boolean) {
     ctx = value; _args = args; _isUpdate = isUpdate
-    aNull = ctx.NULL()
-    aText = ctx.TEXT()
-    aLong = ctx.LONG()
-    aDouble = ctx.DOUBLE()
-    aBool = ctx.BOOL()
-    aTime = ctx.TIME()
-    aDate = ctx.DATE()
-    aDateTime = ctx.DATETIME()
-    aParam = ctx.PARAM()
+    tValue = ValueProxy(value)
   }
 
   fun process(prop: SProperty): Any? {
@@ -54,67 +29,13 @@ class ValueProxy {
       is SField -> processField(prop)
       is SReference -> processRefID(prop, prop.isOptional)
       is SCollection -> {
-        if (aParam != null) {
-          val key = aParam.text.substring(1)
+        if (tValue.aParam != null) {
+          val key = tValue.aParam.text.substring(1)
           _args.getRefIDList(key)
         } else
-          throw Exception("Expecting a collection or a parameter for '${prop.entity!!.name}.${prop.name}'.")
+          throw Exception("Expecting a collection or parameters for '${prop.entity!!.name}.${prop.name}'.")
       }
     }
-  }
-
-  fun processField(field: SField): Any? = when {
-    aNull != null -> {
-      if (!field.isOptional)
-        throw Exception("Expecting an input value for non-optional field '${field.entity!!.name}.${field.name}'.")
-      null
-    }
-
-    aText != null -> {
-      field.tryType(FType.TEXT)
-      aText.text.substring(1, aText.text.length-1)
-    }
-
-    aLong != null -> {
-      field.tryType(FType.LONG)
-      val value = aLong.text
-      if (field.type == FType.INT) value.toInt() else value.toLong()
-    }
-
-    aDouble != null -> {
-      field.tryType(FType.DOUBLE)
-      val value = aDouble.text
-      if (field.type == FType.FLOAT) value.toFloat() else value.toDouble()
-    }
-
-    aBool != null -> {
-      field.tryType(FType.BOOL)
-      aBool.text!!.toBoolean()
-    }
-
-    aTime != null -> {
-      field.tryType(FType.TIME)
-      LocalTime.parse(aTime.text.substring(1))
-    }
-
-    aDate != null -> {
-      field.tryType(FType.DATE)
-      LocalDate.parse(aDate.text.substring(1))
-    }
-
-    aDateTime != null -> {
-      field.tryType(FType.DATETIME)
-      LocalDateTime.parse(aDateTime.text.substring(1))
-    }
-
-    aParam != null -> {
-      val key = aParam.text.substring(1)
-      val value = _args[key] ?: throw Exception("Expecting an argument value for '${field.entity!!.name}.${field.name}'.")
-      field.tryType(TypeEngine.convert(value.javaClass.kotlin))
-      value
-    }
-
-    else -> throw Exception("Expecting typeOf (null, text, long, double, bool, time, data, datetime, param) for '${field.entity!!.name}.${field.name}'.")
   }
 
   fun processRefID(ref: SRelation, isOptional: Boolean): RefID {
@@ -126,22 +47,185 @@ class ValueProxy {
     }
 
     return when {
-      aNull != null -> {
+      tValue.aNull != null -> {
         if (!isOptional)
           throw Exception("Expecting an input value for a non-optional reference '${ref.entity!!.name}.${ref.name}'.")
         RefID()
       }
 
-      aLong != null -> RefID(aLong.text.toLong())
+      tValue.aLong != null -> RefID(tValue.aLong.text.toLong())
 
-      aParam != null -> {
-        val key = aParam.text.substring(1)
+      tValue.aParam != null -> {
+        val key = tValue.aParam.text.substring(1)
         _args.getRefID(key)
       }
 
       else -> throw Exception("Expecting typeOf (null, long, param=RefID) for '${ref.entity!!.name}.${ref.name}'.")
     }
   }
+
+  private fun processField(field: SField): Any? = when {
+    tValue.aNull != null -> {
+      if (!field.isOptional)
+        throw Exception("Expecting an input value for non-optional field '${field.entity!!.name}.${field.name}'.")
+      null
+    }
+
+    tValue.aText != null -> {
+      field.tryType(FType.TEXT)
+      tValue.aText.text.substring(1, tValue.aText.text.length-1)
+    }
+
+    tValue.aLong != null -> {
+      field.tryType(FType.LONG)
+      val value = tValue.aLong.text
+      if (field.type == FType.INT) value.toInt() else value.toLong()
+    }
+
+    tValue.aDouble != null -> {
+      field.tryType(FType.DOUBLE)
+      val value = tValue.aDouble.text
+      if (field.type == FType.FLOAT) value.toFloat() else value.toDouble()
+    }
+
+    tValue.aBool != null -> {
+      field.tryType(FType.BOOL)
+      tValue.aBool.text!!.toBoolean()
+    }
+
+    tValue.aTime != null -> {
+      field.tryType(FType.TIME)
+      LocalTime.parse(tValue.aTime.text.substring(1))
+    }
+
+    tValue.aDate != null -> {
+      field.tryType(FType.DATE)
+      LocalDate.parse(tValue.aDate.text.substring(1))
+    }
+
+    tValue.aDateTime != null -> {
+      field.tryType(FType.DATETIME)
+      LocalDateTime.parse(tValue.aDateTime.text.substring(1))
+    }
+
+    tValue.aParam != null -> {
+      val key = tValue.aParam.text.substring(1)
+      val value = _args[key] ?: throw Exception("Expecting an argument value for '${field.entity!!.name}.${field.name}'.")
+      field.tryType(TypeEngine.convert(value.javaClass.kotlin))
+      value
+    }
+
+    else -> throw Exception("Expecting typeOf (null, text, long, double, bool, time, data, datetime, param) for '${field.entity!!.name}.${field.name}'.")
+  }
+}
+
+class ValueProxy {
+  val aNull: TerminalNode?
+  val aText: TerminalNode?
+  val aLong: TerminalNode?
+  val aDouble: TerminalNode?
+  val aBool: TerminalNode?
+  val aTime: TerminalNode?
+  val aDate: TerminalNode?
+  val aDateTime: TerminalNode?
+  val aParam: TerminalNode?
+
+  constructor(ctx: CreateParser.ValueContext) {
+    aNull = ctx.NULL()
+    aText = ctx.TEXT()
+    aLong = ctx.LONG()
+    aDouble = ctx.DOUBLE()
+    aBool = ctx.BOOL()
+    aTime = ctx.TIME()
+    aDate = ctx.DATE()
+    aDateTime = ctx.DATETIME()
+    aParam = ctx.PARAM()
+  }
+
+  constructor(ctx: UpdateParser.ValueContext) {
+    aNull = ctx.NULL()
+    aText = ctx.TEXT()
+    aLong = ctx.LONG()
+    aDouble = ctx.DOUBLE()
+    aBool = ctx.BOOL()
+    aTime = ctx.TIME()
+    aDate = ctx.DATE()
+    aDateTime = ctx.DATETIME()
+    aParam = ctx.PARAM()
+  }
+
+  fun parse(): Any = when {
+    aText != null -> aText.text.substring(1, aText.text.length-1)
+    aLong != null -> aLong.text.toLong()
+    aDouble != null -> aDouble.text.toDouble()
+    aBool != null -> aBool.text!!.toBoolean()
+    aTime != null -> LocalTime.parse(aTime.text.substring(1))
+    aDate != null -> LocalDate.parse(aDate.text.substring(1))
+    aDateTime != null -> LocalDateTime.parse(aDateTime.text.substring(1))
+
+    aNull != null -> throw Exception("Unsupported null inside a map!")
+    aParam != null -> throw Exception("Unsupported parameter inside a map!")
+    else -> throw Exception("Unrecognized parameter type!")
+  }
+}
+
+class ListProxy {
+  private val items: List<Any>?
+
+  constructor(ctx: CreateParser.ListContext) {
+    items = ctx.item()?.map { if (it.value() != null) ValueProxy(it.value()).parse() else MapProxy(it.data()).parse() }
+  }
+
+  constructor(ctx: UpdateParser.ListContext) {
+    items = ctx.item()?.map { if (it.value() != null) ValueProxy(it.value()).parse() else MapProxy(it.data()).parse() }
+  }
+
+  fun parse(): List<Any> = items ?: emptyList()
+}
+
+class EntryProxy {
+  val key: String
+  val data: Any?
+  val list: List<Any>?
+  val value: Any?
+
+  constructor(ctx: CreateParser.EntryContext) {
+    key = ctx.ID().text
+    data = ctx.data()?.let { MapProxy(it).parse() }
+    list = ctx.list()?.item()?.map { if (it.value() != null) ValueProxy(it.value()).parse() else MapProxy(it.data()).parse() }
+    value = ctx.value()?.let { ValueProxy(it).parse() }
+  }
+
+  constructor(ctx: UpdateParser.EntryContext) {
+    key = ctx.ID().text
+    data = ctx.data()?.let { MapProxy(it).parse() }
+    list = ctx.list()?.item()?.map { if (it.value() != null) ValueProxy(it.value()).parse() else MapProxy(it.data()).parse() }
+    value = ctx.value()?.let { ValueProxy(it).parse() }
+  }
+
+  fun parse(): Pair<String, Any> {
+    val eValue = when {
+      data != null -> data
+      list != null -> list
+      value != null -> value
+      else -> throw Exception("Bug - EntryProxy.parse() - 1. Unrecognized dsl branch!")
+    }
+
+    return Pair(key, eValue)
+  }
+}
+
+class MapProxy {
+  val entries: Map<String, Any>?
+  constructor(ctx: CreateParser.DataContext) {
+    entries = ctx.entry()?.map { EntryProxy(it).parse() }?.toMap()
+  }
+
+  constructor(ctx: UpdateParser.DataContext) {
+    entries = ctx.entry()?.map { EntryProxy(it).parse() }?.toMap()
+  }
+
+  fun parse(): Map<String, Any> = entries ?: emptyMap()
 }
 
 fun Map<String, Any>.getRefID(key: String): RefID {

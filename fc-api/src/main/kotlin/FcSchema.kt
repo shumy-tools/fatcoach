@@ -78,12 +78,17 @@ class FcSchema(onChange: (FcSchema.() -> Unit)? = null) {
 
 class SEntity(val name: String, val type: EType) {
   internal var schema: FcSchema? = null
-  //internal var ownedBy: SEntity? = null
   internal var parent: SReference? = null
 
+  val id: SField
   val all: Map<String, SProperty> = linkedMapOf()
   val fields: Map<String, SField> = linkedMapOf()
   val rels: Map<String, SRelation> = linkedMapOf()
+
+  init {
+    id = SField(SID, FType.LONG, isInput = false, isOptional = false, isUnique = true)
+    id.entity = this
+  }
 
   /* ------------------------- owned/linked -------------------------*/
   val ownedRefs: List<SReference>
@@ -161,8 +166,8 @@ class SEntity(val name: String, val type: EType) {
   fun del(name: String) {
     checkChange()
 
-    if (name == PARENT)
-      throw Exception("Cannot remove '$PARENT' from a SEntity.")
+    if (name == SPARENT)
+      throw Exception("Cannot remove '$SPARENT' from a SEntity.")
 
     (fields as LinkedHashMap<String, SField>).remove(name)
     (rels as LinkedHashMap<String, SRelation>).remove(name)
@@ -170,10 +175,15 @@ class SEntity(val name: String, val type: EType) {
     val sProperty = (all as LinkedHashMap<String, SProperty>).remove(name)
     sProperty?.entity = null
   }
+
+  override fun toString() = """SEntity(${name}):
+    |  ${all.values.joinToString("\n|  ")}
+  """.trimMargin()
 }
 
 sealed class SProperty(val name: String, val isInput: Boolean, val isUnique: Boolean) {
   internal var entity: SEntity? = null
+  abstract fun simpleString(): String
 }
 
   class SField(
@@ -182,7 +192,10 @@ sealed class SProperty(val name: String, val isInput: Boolean, val isUnique: Boo
     val isOptional: Boolean,
     isInput: Boolean,
     isUnique: Boolean
-  ): SProperty(name, isInput, isUnique)
+  ): SProperty(name, isInput, isUnique) {
+    override fun simpleString() = "(${type.name.toLowerCase()}@$name)"
+    override fun toString() = "SField(${entity!!.name}::${simpleString()}, optional=$isOptional, input=$isInput, unique=$isUnique)"
+  }
 
   sealed class SRelation(
     name: String,
@@ -190,7 +203,9 @@ sealed class SProperty(val name: String, val isInput: Boolean, val isUnique: Boo
     val ref: SEntity,
     isInput: Boolean,
     isUnique: Boolean
-  ): SProperty(name, isInput, isUnique)
+  ): SProperty(name, isInput, isUnique) {
+    override fun simpleString() = "(${ref.name}@$name)"
+  }
 
     class SReference(
       name: String,
@@ -199,7 +214,9 @@ sealed class SProperty(val name: String, val isInput: Boolean, val isUnique: Boo
       val isOptional: Boolean,
       isInput: Boolean,
       isUnique: Boolean
-    ): SRelation(name, type, ref, isInput, isUnique)
+    ): SRelation(name, type, ref, isInput, isUnique) {
+      override fun toString() = "SReference(${entity!!.name}::${simpleString()}, type=${type.name.toLowerCase()}, optional=$isOptional, input=$isInput, unique=$isUnique)"
+    }
 
     class SCollection(
       name: String,
@@ -207,7 +224,9 @@ sealed class SProperty(val name: String, val isInput: Boolean, val isUnique: Boo
       ref: SEntity,
       isInput: Boolean,
       isUnique: Boolean
-    ): SRelation(name, type, ref, isInput, isUnique)
+    ): SRelation(name, type, ref, isInput, isUnique) {
+      override fun toString() = "SCollection(${entity!!.name}::${simpleString()}, type=${type.name.toLowerCase()}, input=$isInput, unique=$isUnique)"
+    }
 
 /* ------------------------- helpers -------------------------*/
 fun SEntity.own(sProperty: SRelation) {
@@ -218,7 +237,7 @@ fun SEntity.own(sProperty: SRelation) {
     if (sProperty.ref.parent != null)
       throw Exception("SEntity '${sProperty.ref.name}' already owned by '$name'.")
 
-    val parentRef = SReference(PARENT, RType.LINKED, ref = this, isOptional = false, isInput = true, isUnique = (sProperty is SReference))
+    val parentRef = SReference(SPARENT, RType.LINKED, ref = this, isOptional = false, isInput = true, isUnique = (sProperty is SReference))
     sProperty.ref.parent = parentRef
     sProperty.ref.add(parentRef)
   }

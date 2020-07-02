@@ -1,7 +1,7 @@
 package fc.api
 
-const val ID = "@id"
-const val PARENT = "@parent"
+const val SID = "@id"
+const val SPARENT = "@parent"
 
 enum class OType { ADD, DEL }
 

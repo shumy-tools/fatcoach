@@ -13,6 +13,6 @@ PARAM: '?' ID;
 
 ALL: '*' ;
 NAME: [A-Z][A-Za-z0-9_]* ;
-ID: [_@]?[a-z][A-Za-z0-9_]* ;
+ID: [_@]?[a-z][A-Za-z0-9_-]* ;
 
 WS: [ \t\r\n\f]+ -> skip ;

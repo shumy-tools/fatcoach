@@ -34,6 +34,7 @@ class Query internal constructor(dsl: String, private val adaptor: IAdaptor) {
     return Base64.getUrlEncoder().encodeToString(bytes)
   }
 
+  fun exec(vararg args: Pair<String, Any>) = exec(args.toMap())
   fun exec(args: Map<String, Any>): IResult {
     // TODO: check security on accessed properties?
 
@@ -51,51 +52,3 @@ class Query internal constructor(dsl: String, private val adaptor: IAdaptor) {
     return adaptor.execQuery(tree, args)
   }
 }
-
-// ----------- query structure -----------
-data class QParameter(val name: String, val type: FType, val isLimitOrPage: Boolean = false)
-
-data class QTree(
-  val entity: SEntity,
-  val filter: QExpression?,
-  val limit: Any?,            // expecting Long or QParameter
-  val page: Any?,             // expecting Long or QParameter
-  val select: QSelect
-) {
-  constructor(entity: SEntity, rel: QRelation): this(entity, rel.filter, rel.limit, rel.page, rel.select)
-}
-
-// ----------- filter structure -----------
-data class QExpression(
-  val left: QExpression?,
-  val oper: OperType?,
-  val right: QExpression?,
-  val predicate: QPredicate?
-)
-
-data class QPredicate(
-  val start: SEntity,
-  val path: List<SProperty>,
-  val end: SField,
-
-  val comp: CompType,
-  val param: Any?                // expecting the 'end' type or QParameter
-)
-
-// ----------- select structure -----------
-data class QSelect(
-  val fields: Map<SField, QField>,
-  val relations: Map<SRelation, QRelation>
-)
-
-data class QField(
-  val sort: SortType,
-  val order: Int
-)
-
-data class QRelation(
-  val filter: QExpression?,
-  val limit: Any?,            // expecting Long or QParameter
-  val page: Any?,             // expecting Long or QParameter
-  val select: QSelect
-)

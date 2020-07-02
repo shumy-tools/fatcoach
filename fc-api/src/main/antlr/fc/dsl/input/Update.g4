@@ -3,18 +3,20 @@ grammar Update;
 
 import Common;
 
-update: entity '@id' '=' id=longOrParam data EOF ;
+update: entity '@id' '==' id=longOrParam data EOF ;
 
   entity: (ID '.')* NAME ;
 
   longOrParam: (LONG | PARAM) ;
 
-  data: '{' entry (',' entry)* '}' ;
+  data: '{' (entry (',' entry)*)? '}' ;
 
     entry: ID ':' (oper | data | list | value) ;
 
       oper: (add='@add' | del='@del') (list | value) ;
 
-      list: '[' ((value (',' value)*) | (data (',' data)*)) ']' ;
+      list: '[' (item (',' item)*)? ']' ;
+
+      item: value | data ;
 
       value: NULL | TEXT | LONG | DOUBLE | BOOL | TIME | DATE | DATETIME | PARAM ;

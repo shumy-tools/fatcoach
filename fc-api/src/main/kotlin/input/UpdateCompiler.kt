@@ -1,6 +1,7 @@
 package fc.api.input
 
 import fc.api.*
+import fc.api.spi.FcCreate
 import fc.api.spi.FcUpdate
 import fc.api.spi.InputInstructions
 import fc.dsl.input.UpdateBaseListener
@@ -13,15 +14,7 @@ import org.antlr.v4.runtime.tree.ErrorNode
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 
 internal class UpdateCompiler(private val dsl: String, private val schema: FcSchema, private val tx: InputInstructions, private val args: Map<String, Any>): UpdateBaseListener() {
-  lateinit var refID: RefID
-    internal set
-
-  lateinit var entity: SEntity
-    internal set
-
-  val accessed = mutableSetOf<SProperty>()
   val errors = mutableListOf<String>()
-
   init { compile() }
 
   private fun compile() {
@@ -40,94 +33,91 @@ internal class UpdateCompiler(private val dsl: String, private val schema: FcSch
 
   override fun enterUpdate(ctx: UpdateContext) {
     val eText = ctx.entity().text
-    entity = schema.find(eText)
+    val entity = schema.find(eText)
 
-    refID = if (ctx.id.LONG() != null) RefID(ctx.id.LONG().text.toLong()) else {
+    val refID = if (ctx.id.LONG() != null) RefID(ctx.id.LONG().text.toLong()) else {
       val key = ctx.id.PARAM().text.substring(1)
       args.getRefID(key)
     }
 
-    val inputs = ctx.data().processData(entity!!)
-    tx.add(FcUpdate(entity, refID, inputs))
+    ctx.data().processData(entity, refID)
   }
 
-  private fun DataContext.processData(sEntity: SEntity): Map<String, Any?> {
-    return entry().map {
+  private fun DataContext.processData(self: SEntity, selfID: RefID) {
+    val fcUpdate = FcUpdate(self, selfID)
+    fcUpdate.accessed.add(self.id)
+    tx.add(fcUpdate)
+
+    val inputs = entry()?.map {
       val prop = it.ID().text
-      val sProperty = sEntity.all[prop] ?: throw Exception("Property '$prop' not found in entity '${sEntity.name}.")
+      val sProperty = self.all[prop] ?: throw Exception("Property '$prop' not found in entity '${self.name}.")
 
       // parse input properties
       val value = if (sProperty.isInput) {
-        accessed.add(sProperty)
+        fcUpdate.accessed.add(sProperty)
         when {
-          it.value() != null -> ValueProxy(it.value(), args, true).process(sProperty)
+          it.value() != null -> FieldProxy(it.value(), args, true).process(sProperty)
           it.list() != null -> it.list().processList(sProperty)
-
-          it.oper() != null -> {
-            if (sProperty !is SRelation)
-              throw Exception("Unexpected operation (@add, @del) for field '${sEntity.name}.$prop'.")
-
-            val oper = it.oper()
-            val operType = if (oper.add != null) OType.ADD else OType.DEL
-            when {
-              oper.value() != null -> {
-                val refs = ValueProxy(oper.value(), args, true).process(sProperty)
-                if (sProperty is SCollection) {
-                  (refs as List<*>).map { refID -> RefLink(operType, refID as RefID) }
-                } else {
-                  RefLink(operType, refs as RefID)
-                }
-              }
-
-              oper.list() != null -> {
-                if (sProperty !is SCollection)
-                  throw Exception("Unexpected list for field/reference '${sEntity.name}.$prop'.")
-
-                oper.list().processList(sProperty).map { refID -> RefLink(operType, refID as RefID) }
-              }
-
-              else -> throw Exception("Update bug - 1. Unrecognized dsl branch!")
+          it.oper() != null -> it.oper().processOperation(sProperty)
+          it.data() != null -> {
+            val obj = it.data()
+            when (sProperty) {
+              is SField -> { sProperty.tryType(FType.MAP); MapProxy(obj).parse() }
+              is SReference -> throw Exception("Expecting typeOf (null, long, param) for '${self.name}.$prop'.")
+              is SCollection -> throw Exception("Expecting a collection for '${self.name}.$prop'.")
             }
           }
-
-          it.data() != null -> {
-            // TODO: process field MAP ?
-            TODO()
-          }
-          else -> throw Exception("Update bug - 2. Unrecognized dsl branch!")
+          else -> throw Exception("Bug - UpdateCompiler.processData() - 1. Unrecognized dsl branch!")
         }
-      } else throw Exception("Update bug - 3. Unrecognized dsl branch!")
+      } else throw Exception("Bug - UpdateCompiler.processData() - 2. Unrecognized dsl branch!")
 
       sProperty.name to value
-    }.toMap()
+    }?.toMap() ?: emptyMap()
 
     // TODO: process derive fields ?
+    fcUpdate.values = inputs
+  }
+
+  private fun OperContext.processOperation(sProperty: SProperty): Any {
+    val prop = sProperty.name
+    val sEntity = sProperty.entity!!
+    if (sProperty !is SRelation)
+      throw Exception("Unexpected operation (@add, @del) for field '${sEntity.name}.$prop'.")
+
+    val operType = if (add != null) OType.ADD else OType.DEL
+    return when {
+      value() != null -> {
+        val refs = FieldProxy(value(), args, true).process(sProperty)
+        if (sProperty is SCollection) {
+          (refs as List<*>).map { refID -> RefLink(operType, refID as RefID) }
+        } else {
+          RefLink(operType, refs as RefID)
+        }
+      }
+
+      list() != null -> {
+        if (sProperty !is SCollection)
+          throw Exception("Unexpected list for field/reference '${sEntity.name}.$prop'.")
+        list().processList(sProperty).map { refID -> RefLink(operType, refID as RefID) }
+      }
+
+      else -> throw Exception("Bug - UpdateCompiler.processOperation(). Unrecognized dsl branch!")
+    }
   }
 
   private fun ListContext.processList(prop: SProperty): List<Any?> {
     return when (prop) {
       is SField -> {
         when (prop.type) {
-          FType.LIST -> {
-            val value = value() ?: throw Exception("Expecting a collection of values for '${prop.entity!!.name}.${prop.name}'.")
-            value.map { ValueProxy(it, args, true).processField(prop) }
-          }
-
-          // TODO: process field MAP ?
-          FType.MAP -> TODO()
-
-          else -> throw Exception("Expecting a collection of values or objects for '${prop.entity!!.name}.${prop.name}'.")
+          FType.LIST -> ListProxy(this).parse()
+          FType.MAP -> throw Exception("Expecting an object for '${prop.entity!!.name}.${prop.name}'.")
+          else -> throw Exception("A list is not compatible with the type '${prop.type.name.toLowerCase()}' for '${prop.entity!!.name}.${prop.name}'.")
         }
       }
 
       is SCollection -> when (prop.type) {
         RType.OWNED -> throw Exception("Updating an owned reference/collection is not supported. Update '${prop.entity!!.name}.${prop.name}' using the @parent field.")
-
-        RType.LINKED -> {
-          if (value() == null)
-            throw Exception("Expecting a collection of references for '${prop.entity!!.name}.${prop.name}'.")
-          value().map { ValueProxy(it, args, true).processRefID(prop, false) }
-        }
+        RType.LINKED -> item().map { FieldProxy(it.value(), args, false).processRefID(prop, false) }
       }
 
       is SReference -> throw Exception("Expecting a reference for '${prop.entity!!.name}.${prop.name}'.")
