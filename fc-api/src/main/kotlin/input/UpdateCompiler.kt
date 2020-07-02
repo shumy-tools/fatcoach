@@ -1,7 +1,6 @@
 package fc.api.input
 
 import fc.api.*
-import fc.api.spi.FcCreate
 import fc.api.spi.FcUpdate
 import fc.api.spi.InputInstructions
 import fc.dsl.input.UpdateBaseListener

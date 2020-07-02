@@ -1,8 +1,8 @@
 package fc.api.spi
 
+import fc.api.FcData
 import fc.api.FcSchema
 import fc.api.SEntity
-import fc.api.FcData
 import fc.api.query.IResult
 import fc.api.query.QTree
 

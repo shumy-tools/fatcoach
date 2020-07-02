@@ -1,6 +1,7 @@
 package fc.api.query
 
-import fc.api.*
+import fc.api.SProperty
+import fc.api.TypeEngine
 import fc.api.spi.IAdaptor
 import java.security.MessageDigest
 import java.util.*
@@ -36,8 +37,6 @@ class Query internal constructor(dsl: String, private val adaptor: IAdaptor) {
 
   fun exec(vararg args: Pair<String, Any>) = exec(args.toMap())
   fun exec(args: Map<String, Any>): IResult {
-    // TODO: check security on accessed properties?
-
     parameters.forEach {
       val arg = args[it.name] ?: throw Exception("Expected parameter value for: '${it.name}'")
       if (!TypeEngine.check(it.type, arg.javaClass.kotlin))

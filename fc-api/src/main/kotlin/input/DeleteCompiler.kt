@@ -2,13 +2,12 @@ package fc.api.input
 
 import fc.api.FcSchema
 import fc.api.RefID
-import fc.api.SEntity
 import fc.api.spi.FcDelete
 import fc.api.spi.InputInstructions
 import fc.dsl.input.DeleteBaseListener
 import fc.dsl.input.DeleteLexer
 import fc.dsl.input.DeleteParser
-import fc.dsl.input.DeleteParser.*
+import fc.dsl.input.DeleteParser.DeleteContext
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ErrorNode

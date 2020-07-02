@@ -14,7 +14,6 @@ class FcTxData internal constructor(private val schema: FcSchema) {
     if (compiled.errors.isNotEmpty())
       throw Exception("Failed to compile create! ${compiled.errors}")
 
-    // TODO: compute derived values
     return compiled.tree
   }
 
@@ -23,8 +22,6 @@ class FcTxData internal constructor(private val schema: FcSchema) {
     val compiled = UpdateCompiler(dsl, schema, tx, args)
     if (compiled.errors.isNotEmpty())
       throw Exception("Failed to compile update! ${compiled.errors}")
-
-    // TODO: compute derived values
   }
 
   fun delete(dsl: String, arg: RefTree) = delete(dsl, arg.root)

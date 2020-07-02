@@ -39,7 +39,7 @@ private class SecurityChecker(private val instructions: List<FcInstruction>) {
 private class InputSecurity: IAuthorizer {
   private val session = ThreadLocal<List<FcInstruction>>()
 
-  override fun canQuery(props: Set<SProperty>) { TODO("Not yet implemented") }
+  override fun canQuery(props: Set<SProperty>) { throw Exception("Not used!") }
   override fun canInput(instruction: FcInstruction) {
     val instructions = session.getOrSet { mutableListOf() } as MutableList<FcInstruction>
     instructions.add(instruction)

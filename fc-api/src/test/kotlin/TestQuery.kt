@@ -13,19 +13,14 @@ import org.junit.FixMethodOrder
 import org.junit.Test
 
 private class EmptyResult(override val rows: List<FcData> = emptyList()) : IResult {
-  override fun <R : Any> get(name: String): R? {
-    TODO("Empty")
-  }
-
-  override fun iterator(): Iterator<IRowGet> {
-    TODO("Empty")
-  }
+  override fun <R : Any> get(name: String): R? = throw Exception("Not used!")
+  override fun iterator(): Iterator<IRowGet> = throw Exception("Not used!")
 }
 
 private class QuerySecurity: IAuthorizer {
   private val session = ThreadLocal<Set<SProperty>>()
 
-  override fun canInput(instruction: FcInstruction) { TODO("Not yet implemented") }
+  override fun canInput(instruction: FcInstruction) { throw Exception("Not used!") }
   override fun canQuery(props: Set<SProperty>) = session.set(props)
 
   fun check(props: String) = assert(session.get().text() == props)
