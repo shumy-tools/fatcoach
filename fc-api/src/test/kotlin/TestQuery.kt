@@ -7,8 +7,8 @@ import fc.api.SProperty
 import fc.api.query.IResult
 import fc.api.query.IRowGet
 import fc.api.query.QTree
-import fc.api.security.IAccessed
-import fc.api.security.InstructionType
+import fc.api.security.IAuthorizer
+import fc.api.spi.FcInstruction
 import org.junit.FixMethodOrder
 import org.junit.Test
 
@@ -22,20 +22,14 @@ private class EmptyResult(override val rows: List<FcData> = emptyList()) : IResu
   }
 }
 
-private class Security: IAccessed {
+private class QuerySecurity: IAuthorizer {
   private val session = ThreadLocal<Set<SProperty>>()
-  override fun canAccess(type: InstructionType, props: Set<SProperty>) {
-    session.set(props)
-  }
 
-  fun check(props: String) {
-    assert(session.get().text() == props)
-  }
+  override fun canInput(instruction: FcInstruction) { TODO("Not yet implemented") }
+  override fun canQuery(props: Set<SProperty>) = session.set(props)
 
-  fun print() {
-    println("Access: ${session.get().text()}")
-  }
-
+  fun check(props: String) = assert(session.get().text() == props)
+  fun print() = println("Access: ${session.get().text()}")
   private fun Set<SProperty>.text() = map{"${it.entity!!.name}::${it.simpleString()}"}.toString()
 }
 
@@ -67,7 +61,7 @@ private class TestQueryAdaptor(override val schema: FcSchema) : TestAdaptor(sche
 class TestQuery {
   private val schema = createCorrectSchema()
   private val adaptor = TestQueryAdaptor(schema)
-  private val security = Security()
+  private val security = QuerySecurity()
   private val db = FcDatabase(adaptor, security)
 
   @Test fun testSimpleQuery() {

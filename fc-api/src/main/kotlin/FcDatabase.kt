@@ -1,11 +1,10 @@
 package fc.api
 
 import fc.api.query.Query
-import fc.api.security.IAccessed
-import fc.api.security.InstructionType
+import fc.api.security.IAuthorizer
 import fc.api.spi.IAdaptor
 
-class FcDatabase(private val adaptor: IAdaptor, private val accessed: IAccessed? = null) {
+class FcDatabase(private val adaptor: IAdaptor, private val authorizer: IAuthorizer? = null) {
   val schema: FcSchema
     get() = adaptor.schema
 
@@ -17,8 +16,8 @@ class FcDatabase(private val adaptor: IAdaptor, private val accessed: IAccessed?
     transaction(txData)
 
     // check security constraints
-    accessed?.let {
-      txData.tx.all.forEach { accessed.canAccess(it.type, it.accessed) }
+    authorizer?.let {
+      txData.tx.all.forEach { authorizer.canInput(it) }
     }
 
     adaptor.execInput(txData.tx)
@@ -30,7 +29,7 @@ class FcDatabase(private val adaptor: IAdaptor, private val accessed: IAccessed?
 
     // check security constraints
     val accessedFields = setOf(sEntity.id).plus(sEntity.fields.values)
-    accessed?.canAccess(InstructionType.QUERY, accessedFields)
+    authorizer?.canQuery(accessedFields)
 
     return adaptor.getById(sEntity, id)
   }
@@ -42,7 +41,7 @@ class FcDatabase(private val adaptor: IAdaptor, private val accessed: IAccessed?
     val query = Query(dsl, adaptor)
 
     // check security constraints
-    accessed?.canAccess(InstructionType.QUERY, query.accessed)
+    authorizer?.canQuery(query.accessed)
     return query
   }
 }
