@@ -10,10 +10,10 @@ import fc.api.spi.IAdaptor
 import fc.api.spi.InputInstructions
 
 open class TestAdaptor(override val schema: FcSchema) : IAdaptor {
-  override fun changeSchema(updated: FcSchema) = throw Exception("Not used!")
+  override fun changeSchema(updated: FcSchema): Unit = throw Exception("Not used!")
   override fun execQuery(query: QTree, args: Map<String, Any>): IResult = throw Exception("Not used!")
   override fun getById(sEntity: SEntity, id: Long): FcData = throw Exception("Not used!")
-  override fun execInput(instructions: InputInstructions) = throw Exception("Not used!")
+  override fun execInput(instructions: InputInstructions): Unit = throw Exception("Not used!")
 }
 
 fun createCorrectSchema() = FcSchema {
