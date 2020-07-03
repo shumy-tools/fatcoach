@@ -10,13 +10,20 @@
 		"typescript.tsdk": "node_modules/typescript/lib",
 		"vetur.experimental.templateInterpolationService": true,
 		"files.exclude": {
-			".*": true,
+			//".*": true,
+			".quasar": true,
 			".vscode": true,
+			".gitignore": true,
+			".editorconfig": true,
+			".eslintignore": true,
+			".postcssrc.js": true,
 			"build": true,
 			"node_modules": true,
 			"package-lock.json": true,
 			"babel.config.js": true,
-			"tsconfig.json": true
+			"tsconfig.json": true,
+			"src/env.d.ts": true,
+			"src/index.template.html": true
         }
 	}
 }

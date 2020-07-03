@@ -1,22 +1,19 @@
 <template>
-  <q-layout view="hHh lpR fFf" class="bg-grey-9">
-    <q-header elevated class="bg-grey-9 q-py-xs" height-hint="58">
+  <q-layout view="hHh lpR fFf" class="bg-grey-2">
+    <q-header elevated class="bg-white text-grey-8 q-py-xs" height-hint="58">
       <q-toolbar>
-        <q-btn flat dense round @click="leftDrawerOpen = !leftDrawerOpen" aria-label="Menu" icon="menu" />
+        <q-btn color="grey" flat dense round @click="leftDrawerOpen = !leftDrawerOpen" aria-label="Menu" icon="menu" />
 
         <q-btn flat no-caps no-wrap class="q-ml-xs" v-if="$q.screen.gt.xs">
-          <q-icon :name="fabYoutube" color="red" size="28px" />
+          <!--<q-icon :name="fabYoutube" color="red" size="28px" />-->
           <q-toolbar-title shrink class="text-weight-bold">
             FatCoach
           </q-toolbar-title>
         </q-btn>
 
-        <q-space />
-
-        <div class="FC__toolbar-input-container row no-wrap">
-          <q-input dense outlined square v-model="search" placeholder="Search" class="bg-grey-8 col" />
-          <q-btn class="FC__toolbar-input-btn bg-grey-8" color="grey-3" text-color="grey-6" icon="search" unelevated />
-        </div>
+        <q-tabs shrink class="text-weight-bold">
+          <q-route-tab label="Data" class="text-orange" to="/data" />
+        </q-tabs>
 
         <q-space />
 
@@ -46,151 +43,83 @@
     <q-drawer v-model="leftDrawerOpen" show-if-above bordered :width="240" >
       <q-scroll-area class="fit">
         <q-list padding>
-          <q-item v-for="link in links1" :key="link.text" v-ripple clickable>
-            <q-item-section avatar>
-              <q-icon color="grey" :name="link.icon" />
-            </q-item-section>
-            <q-item-section>
-              <q-item-label>{{ link.text }}</q-item-label>
-            </q-item-section>
-          </q-item>
-
-          <q-separator class="q-my-md" />
-
-          <q-item v-for="link in links2" :key="link.text" v-ripple clickable>
-            <q-item-section avatar>
-              <q-icon color="grey" :name="link.icon" />
-            </q-item-section>
-            <q-item-section>
-              <q-item-label>{{ link.text }}</q-item-label>
-            </q-item-section>
-          </q-item>
-
-          <q-separator class="q-mt-md q-mb-xs" />
-
           <q-item-label header class="text-weight-bold text-uppercase">
-            More from Youtube
+            {{menu.title}}
           </q-item-label>
 
-          <q-item v-for="link in links3" :key="link.text" v-ripple clickable>
+          <q-item v-for="item in menu.items" :key="item.text" :active="item.active" active-class="bg-grey-2 text-orange" clickable @click="route(item)">
             <q-item-section avatar>
-              <q-icon color="grey" :name="link.icon" />
+              <q-icon color="orange" :name="menu.icon" />
             </q-item-section>
             <q-item-section>
-              <q-item-label>{{ link.text }}</q-item-label>
+              <q-item-label>{{ item.text }}</q-item-label>
             </q-item-section>
           </q-item>
 
           <q-separator class="q-my-md" />
 
-          <q-item v-for="link in links4" :key="link.text" v-ripple clickable>
-            <q-item-section avatar>
-              <q-icon color="grey" :name="link.icon" />
-            </q-item-section>
-            <q-item-section>
-              <q-item-label>{{ link.text }}</q-item-label>
-            </q-item-section>
-          </q-item>
-
-          <q-separator class="q-mt-md q-mb-lg" />
-
-          <div class="q-px-md text-grey-8">
-            <div class="row items-center q-gutter-x-sm q-gutter-y-xs">
-              <a v-for="button in buttons1" :key="button.text" class="FC__drawer-footer-link" href="javascript:void(0)">
-                {{ button.text }}
-              </a>
-            </div>
-          </div>
-          <div class="q-py-md q-px-md text-grey-8">
-            <div class="row items-center q-gutter-x-sm q-gutter-y-xs">
-              <a v-for="button in buttons2" :key="button.text" class="FC__drawer-footer-link" href="javascript:void(0)">
-                {{ button.text }}
-              </a>
-            </div>
-          </div>
         </q-list>
       </q-scroll-area>
     </q-drawer>
 
     <q-page-container>
-      <router-view />
+      <div class="q-pa-md q-gutter-sm">
+        <q-breadcrumbs>
+          <template v-slot:separator>
+            <q-icon name="chevron_right"/>
+          </template>
+          <q-breadcrumbs-el label="Home" icon="home" />
+          <q-breadcrumbs-el v-for="item in crumbs" :key="item.text" :label="item.text" :icon="item.icon" />
+        </q-breadcrumbs>
+        <router-view />
+      </div>
     </q-page-container>
+
   </q-layout>
 </template>
 
 <script lang="ts">
-import { fabYoutube } from '@quasar/extras/fontawesome-v5'
-import { Vue, Component } from 'vue-property-decorator'
+import { Vue, Component, Watch } from 'vue-property-decorator'
+import { EventBus, Menu, MenuItem } from '../api/state'
 
 @Component
 export default class MainLayout extends Vue {
-  public fabYoutube = fabYoutube;
-  public leftDrawerOpen = false;
-  public search = '';
+  leftDrawerOpen = false
 
-  public links1 = [
-    { icon: 'home', text: 'Home' },
-    { icon: 'code', text: 'Schema' },
-    { icon: 'subscriptions', text: 'Query' }
-  ];
+  selected?: MenuItem = undefined
+  crumbs: { text: string, icon?: string }[] = []
+  menu: Menu = { title: 'empty', icon: undefined, items: [] }
 
-  public links2 = [
-    { icon: 'folder', text: 'Library' },
-    { icon: 'restore', text: 'History' },
-    { icon: 'watch_later', text: 'Watch later' },
-    { icon: 'thumb_up_alt', text: 'Liked videos' }
-  ];
+  @Watch('$route', { immediate: true, deep: true })
+  onUrlChange () {
+    this.menu.items.forEach(item => item.active = false)
+    if (this.selected)
+      this.selected.active = true
 
-  public links3 = [
-    { icon: fabYoutube, text: 'YouTube Premium' },
-    { icon: 'local_movies', text: 'Movies & Shows' },
-    { icon: 'videogame_asset', text: 'Gaming' },
-    { icon: 'live_tv', text: 'Live' }
-  ];
+    this.updateCrumbs()
+  }
 
-  public links4 = [
-    { icon: 'settings', text: 'Settings' },
-    { icon: 'flag', text: 'Report history' },
-    { icon: 'help', text: 'Help' },
-    { icon: 'feedback', text: 'Send feedback' }
-  ];
+  route (item: MenuItem) {
+    this.selected = item
+    if (item.route !== this.$router.currentRoute.fullPath)
+      this.$router.push({ path: item.route })
+  }
 
-  public buttons1 = [
-    { text: 'About' },
-    { text: 'Press' },
-    { text: 'Copyright' },
-    { text: 'Contact us' },
-    { text: 'Creators' },
-    { text: 'Advertise' },
-    { text: 'Developers' }
-  ];
+  created () {
+    EventBus.$on('$menu', ($menu: any) => {
+      this.menu = $menu
+      this.updateCrumbs()
+    })
+  }
 
-  public buttons2 = [
-    { text: 'Terms' },
-    { text: 'Privacy' },
-    { text: 'Policy & Safety' },
-    { text: 'Test new features' }
-  ];
+  private updateCrumbs() {
+    const path = this.$router.currentRoute.fullPath
+    let list = path.split('/')
+    list.shift()
+    this.crumbs = list.map((item, index) => {
+      const icon = (index == list.length - 1 ? this.menu.icon : undefined)
+      return { text: item, icon: icon }
+    })
+  }
 }
 </script>
-
-<style lang="sass">
-.FC
-  &__toolbar-input-container
-    min-width: 100px
-    width: 55%
-  &__toolbar-input-btn
-    border-radius: 0
-    border-style: solid
-    border-width: 1px 1px 1px 0
-    //border-color: rgba(0,0,0,.24)
-    max-width: 60px
-    width: 100%
-  &__drawer-footer-link
-    color: inherit
-    text-decoration: none
-    font-weight: 500
-    font-size: .75rem
-    &:hover
-      color: #000
-</style>

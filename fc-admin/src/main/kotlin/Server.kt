@@ -70,5 +70,5 @@ fun main() {
   }
 
   val adaptor = TestAdaptor(schema)
-  FcServer(adaptor).start(8080)
+  FcServer(adaptor).start(9090)
 }
