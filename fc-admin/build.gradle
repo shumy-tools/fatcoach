@@ -1,0 +1,11 @@
+plugins {
+  id 'application'
+}
+
+dependencies {
+  compile project(':fc-ws')
+}
+
+application {
+  mainClassName = 'fc.admin.ServerKt'
+}

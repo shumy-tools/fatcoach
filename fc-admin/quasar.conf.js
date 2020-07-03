@@ -25,6 +25,7 @@ module.exports = configure(function (ctx) {
     // --> boot files are part of "main.js"
     // https://quasar.dev/quasar-cli/boot-files
     boot: [
+
       'axios'
     ],
 
@@ -117,9 +118,9 @@ module.exports = configure(function (ctx) {
       workboxPluginMode: 'GenerateSW', // 'GenerateSW' or 'InjectManifest'
       workboxOptions: {}, // only for GenerateSW
       manifest: {
-        name: 'FatCoach IDE',
-        short_name: 'FatCoach IDE',
-        description: 'IDE for the FatCoach Framework',
+        name: 'FatCoach Admin',
+        short_name: 'FatCoach Admin',
+        description: 'FatCoach Admin User Interface',
         display: 'standalone',
         orientation: 'portrait',
         background_color: '#ffffff',
@@ -184,7 +185,7 @@ module.exports = configure(function (ctx) {
       builder: {
         // https://www.electron.build/configuration/configuration
 
-        appId: 'fc-ide'
+        appId: 'fc-admin-ui'
       },
 
       // More info: https://quasar.dev/quasar-cli/developing-electron-apps/node-integration

@@ -1,8 +1,8 @@
 {
-  "name": "fc-ide",
+  "name": "fc-admin-ui",
   "version": "0.0.1",
-  "description": "IDE for the FatCoach Framework",
-  "productName": "FatCoach IDE",
+  "description": "FatCoach Admin User Interface",
+  "productName": "FatCoach Admin",
   "author": "Micael Pedrosa <micaelpedrosa@gmail.com>",
   "private": true,
   "scripts": {
