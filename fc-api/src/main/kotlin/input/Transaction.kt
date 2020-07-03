@@ -1,11 +1,14 @@
-package fc.api.spi
+package fc.api.input
 
 import fc.api.RefID
 import fc.api.SEntity
 import fc.api.SProperty
+import fc.api.SRelation
 
-class InputInstructions {
+class Transaction {
   val all: List<FcInstruction> = mutableListOf()
+
+  fun find(refID: RefID) = all.filter { it.refID == refID }
 
   internal fun add(instruction: FcInstruction) {
     (all as MutableList<FcInstruction>).add(instruction)
@@ -16,17 +19,17 @@ sealed class FcInstruction(val entity: SEntity, val refID: RefID) {
   val accessed = mutableSetOf<SProperty>()
 }
 
-class FcCreate(entity: SEntity, refID: RefID): FcInstruction(entity, refID) {
+class FcCreate internal constructor(entity: SEntity, refID: RefID): FcInstruction(entity, refID) {
   internal lateinit var values: Map<String, Any?>
   override fun toString() = "FcCreate(${entity.name}) @id=$refID - ${values.text()}"
 }
 
-class FcUpdate(entity: SEntity, refID: RefID): FcInstruction(entity, refID) {
+class FcUpdate internal constructor(entity: SEntity, refID: RefID): FcInstruction(entity, refID) {
   internal lateinit var values: Map<String, Any?>
   override fun toString() = "FcUpdate(${entity.name}) @id=$refID - ${values.text()}"
 }
 
-class FcDelete(entity: SEntity, refID: RefID): FcInstruction(entity, refID) {
+class FcDelete internal constructor(entity: SEntity, refID: RefID): FcInstruction(entity, refID) {
   override fun toString() = "FcDelete(${entity.name}) @id=$refID"
 }
 

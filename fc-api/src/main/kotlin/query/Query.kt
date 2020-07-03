@@ -3,15 +3,12 @@ package fc.api.query
 import fc.api.SProperty
 import fc.api.TypeEngine
 import fc.api.spi.IAdaptor
-import java.security.MessageDigest
-import java.util.*
 
 enum class SortType { NONE, ASC, DSC }
 enum class OperType { OR, AND }
 enum class CompType { EQUAL, DIFFERENT, MORE, LESS, MORE_EQ, LESS_EQ, IN }
 
 class Query internal constructor(dsl: String, private val adaptor: IAdaptor) {
-  val hash: String
   val tree: QTree
   val parameters: List<QParameter>
   val accessed: Set<SProperty>
@@ -24,15 +21,6 @@ class Query internal constructor(dsl: String, private val adaptor: IAdaptor) {
     tree = compiled.tree
     parameters = compiled.parameters.values.toList()
     accessed = compiled.accessed
-
-    hash = dsl.hash()
-  }
-
-  private fun String.hash(): String {
-    val compact = replace(Regex("\\s"), "")
-    val digest = MessageDigest.getInstance("SHA-256")
-    val bytes = digest.digest(compact.toByteArray())
-    return Base64.getUrlEncoder().encodeToString(bytes)
   }
 
   fun exec(vararg args: Pair<String, Any>) = exec(args.toMap())

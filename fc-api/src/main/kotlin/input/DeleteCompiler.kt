@@ -2,8 +2,6 @@ package fc.api.input
 
 import fc.api.FcSchema
 import fc.api.RefID
-import fc.api.spi.FcDelete
-import fc.api.spi.InputInstructions
 import fc.dsl.input.DeleteBaseListener
 import fc.dsl.input.DeleteLexer
 import fc.dsl.input.DeleteParser
@@ -13,7 +11,7 @@ import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ErrorNode
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 
-internal class DeleteCompiler(private val dsl: String, private val schema: FcSchema, private val tx: InputInstructions, private val arg: RefID?): DeleteBaseListener() {
+internal class DeleteCompiler(private val dsl: String, private val schema: FcSchema, private val tx: Transaction, private val arg: RefID?): DeleteBaseListener() {
   val errors = mutableListOf<String>()
   init { compile() }
 

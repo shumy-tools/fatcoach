@@ -4,9 +4,8 @@ import fc.api.FcDatabase
 import fc.api.FcSchema
 import fc.api.RefTree
 import fc.api.SProperty
-import fc.api.security.IAuthorizer
-import fc.api.spi.*
-import org.junit.FixMethodOrder
+import fc.api.input.*
+import fc.api.spi.IAuthorizer
 import org.junit.Test
 import kotlin.concurrent.getOrSet
 
@@ -18,7 +17,7 @@ private fun FcInstruction.type() = when (this) {
   is FcDelete -> "DELETE"
 }
 
-private class InputChecker(private val instructions: InputInstructions) {
+private class InputChecker(private val instructions: Transaction) {
   internal var next = 0
   fun check(value: String) {
     assert(instructions.all[next].toString() == value)
@@ -68,8 +67,8 @@ private class InputSecurity: IAuthorizer {
 }
 
 private class TestInputAdaptor(override val schema: FcSchema) : TestAdaptor(schema) {
-  private val session = ThreadLocal<InputInstructions>()
-  override fun execInput(instructions: InputInstructions) {
+  private val session = ThreadLocal<Transaction>()
+  override fun execInput(instructions: Transaction) {
     session.set(instructions)
   }
 
@@ -88,7 +87,6 @@ private class TestInputAdaptor(override val schema: FcSchema) : TestAdaptor(sche
   fun print() = session.get().all.forEach(::println)
 }
 
-@FixMethodOrder
 class TestInput {
   private val schema = createCorrectSchema()
   private val adaptor = TestInputAdaptor(schema)

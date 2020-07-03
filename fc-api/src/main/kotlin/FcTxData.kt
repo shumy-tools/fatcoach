@@ -3,10 +3,10 @@ package fc.api
 import fc.api.input.CreateCompiler
 import fc.api.input.DeleteCompiler
 import fc.api.input.UpdateCompiler
-import fc.api.spi.InputInstructions
+import fc.api.input.Transaction
 
 class FcTxData internal constructor(private val schema: FcSchema) {
-  internal val tx = InputInstructions()
+  internal val tx = Transaction()
 
   fun create(dsl: String, vararg args: Pair<String, Any>) = create(dsl, args.toMap())
   fun create(dsl: String, args: Map<String, Any>): RefTree {

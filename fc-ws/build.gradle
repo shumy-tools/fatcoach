@@ -1,0 +1,5 @@
+dependencies {
+  compile project(':')
+  compile project(':fc-api')
+  implementation 'io.javalin:javalin:3.9.1'
+}

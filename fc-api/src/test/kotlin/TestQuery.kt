@@ -7,9 +7,8 @@ import fc.api.SProperty
 import fc.api.query.IResult
 import fc.api.query.IRowGet
 import fc.api.query.QTree
-import fc.api.security.IAuthorizer
-import fc.api.spi.FcInstruction
-import org.junit.FixMethodOrder
+import fc.api.spi.IAuthorizer
+import fc.api.input.FcInstruction
 import org.junit.Test
 
 private class EmptyResult(override val rows: List<FcData> = emptyList()) : IResult {
@@ -52,7 +51,6 @@ private class TestQueryAdaptor(override val schema: FcSchema) : TestAdaptor(sche
   }
 }
 
-@FixMethodOrder
 class TestQuery {
   private val schema = createCorrectSchema()
   private val adaptor = TestQueryAdaptor(schema)

@@ -80,15 +80,12 @@ class SEntity(val name: String, val type: EType) {
   internal var schema: FcSchema? = null
   internal var parent: SReference? = null
 
-  val id: SField
+  val id: SField = SField(SID, FType.LONG, isInput = false, isOptional = false, isUnique = true)
   val all: Map<String, SProperty> = linkedMapOf()
   val fields: Map<String, SField> = linkedMapOf()
   val rels: Map<String, SRelation> = linkedMapOf()
 
-  init {
-    id = SField(SID, FType.LONG, isInput = false, isOptional = false, isUnique = true)
-    id.entity = this
-  }
+  init { id.entity = this }
 
   /* ------------------------- owned/linked -------------------------*/
   val ownedRefs: List<SReference>
@@ -116,23 +113,23 @@ class SEntity(val name: String, val type: EType) {
     add(newProperty)
   }
 
-  fun linkedRef(name: String, ref: SEntity, isOptional: Boolean = false, isInput: Boolean = true, isUnique: Boolean = false) {
-    val newProperty = SReference(name, RType.LINKED, ref, isOptional, isInput, isUnique)
+  fun linkedRef(name: String, ref: SEntity, isOptional: Boolean = false, isInput: Boolean = true) {
+    val newProperty = SReference(name, RType.LINKED, ref, isOptional, isInput)
     add(newProperty)
   }
 
-  fun ownedRef(name: String, isOptional: Boolean = false, isInput: Boolean = true, isUnique: Boolean = false, owned: SEntity) {
-    val newProperty = SReference(name, RType.OWNED, owned, isOptional, isInput, isUnique)
+  fun ownedRef(name: String, isOptional: Boolean = false, isInput: Boolean = true, owned: SEntity) {
+    val newProperty = SReference(name, RType.OWNED, owned, isOptional, isInput)
     add(newProperty)
   }
 
-  fun linkedCol(name: String, ref: SEntity, isInput: Boolean = true, isUnique: Boolean = false) {
-    val newProperty = SCollection(name, RType.LINKED, ref, isInput, isUnique)
+  fun linkedCol(name: String, ref: SEntity, isInput: Boolean = true) {
+    val newProperty = SCollection(name, RType.LINKED, ref, isInput)
     add(newProperty)
   }
 
-  fun ownedCol(name: String, isInput: Boolean = true, isUnique: Boolean = false, owned: SEntity) {
-    val newProperty = SCollection(name, RType.OWNED, owned, isInput, isUnique)
+  fun ownedCol(name: String, isInput: Boolean = true, owned: SEntity) {
+    val newProperty = SCollection(name, RType.OWNED, owned, isInput)
     add(newProperty)
   }
 
@@ -181,7 +178,7 @@ class SEntity(val name: String, val type: EType) {
   """.trimMargin()
 }
 
-sealed class SProperty(val name: String, val isInput: Boolean, val isUnique: Boolean) {
+sealed class SProperty(val name: String, val isInput: Boolean) {
   internal var entity: SEntity? = null
   abstract fun simpleString(): String
 }
@@ -191,8 +188,8 @@ sealed class SProperty(val name: String, val isInput: Boolean, val isUnique: Boo
     val type: FType,
     val isOptional: Boolean,
     isInput: Boolean,
-    isUnique: Boolean
-  ): SProperty(name, isInput, isUnique) {
+    val isUnique: Boolean
+  ): SProperty(name, isInput) {
     override fun simpleString() = "(${type.name.toLowerCase()}@$name)"
     override fun toString() = "SField(${entity!!.name}::${simpleString()}, optional=$isOptional, input=$isInput, unique=$isUnique)"
   }
@@ -201,9 +198,8 @@ sealed class SProperty(val name: String, val isInput: Boolean, val isUnique: Boo
     name: String,
     val type: RType,
     val ref: SEntity,
-    isInput: Boolean,
-    isUnique: Boolean
-  ): SProperty(name, isInput, isUnique) {
+    isInput: Boolean
+  ): SProperty(name, isInput) {
     override fun simpleString() = "(${ref.name}@$name)"
   }
 
@@ -212,20 +208,18 @@ sealed class SProperty(val name: String, val isInput: Boolean, val isUnique: Boo
       type: RType,
       ref: SEntity,
       val isOptional: Boolean,
-      isInput: Boolean,
-      isUnique: Boolean
-    ): SRelation(name, type, ref, isInput, isUnique) {
-      override fun toString() = "SReference(${entity!!.name}::${simpleString()}, type=${type.name.toLowerCase()}, optional=$isOptional, input=$isInput, unique=$isUnique)"
+      isInput: Boolean
+    ): SRelation(name, type, ref, isInput) {
+      override fun toString() = "SReference(${entity!!.name}::${simpleString()}, type=${type.name.toLowerCase()}, optional=$isOptional, input=$isInput)"
     }
 
     class SCollection(
       name: String,
       type: RType,
       ref: SEntity,
-      isInput: Boolean,
-      isUnique: Boolean
-    ): SRelation(name, type, ref, isInput, isUnique) {
-      override fun toString() = "SCollection(${entity!!.name}::${simpleString()}, type=${type.name.toLowerCase()}, input=$isInput, unique=$isUnique)"
+      isInput: Boolean
+    ): SRelation(name, type, ref, isInput) {
+      override fun toString() = "SCollection(${entity!!.name}::${simpleString()}, type=${type.name.toLowerCase()}, input=$isInput)"
     }
 
 /* ------------------------- helpers -------------------------*/
@@ -237,7 +231,7 @@ fun SEntity.own(sProperty: SRelation) {
     if (sProperty.ref.parent != null)
       throw Exception("SEntity '${sProperty.ref.name}' already owned by '$name'.")
 
-    val parentRef = SReference(SPARENT, RType.LINKED, ref = this, isOptional = false, isInput = true, isUnique = (sProperty is SReference))
+    val parentRef = SReference(SPARENT, RType.LINKED, ref = this, isOptional = false, isInput = true)
     sProperty.ref.parent = parentRef
     sProperty.ref.add(parentRef)
   }
@@ -251,10 +245,39 @@ fun SEntity.clone(): SEntity = SEntity(name, type).also {
         // clone only entities from the original schema
         val ref = if (prop.ref.schema != null) prop.ref.clone() else prop.ref
         when (prop) {
-          is SReference -> it.add(SReference(prop.name, prop.type, ref, prop.isOptional, prop.isInput, prop.isUnique))
-          is SCollection -> it.add(SCollection(prop.name, prop.type, ref, prop.isInput, prop.isUnique))
+          is SReference -> it.add(SReference(prop.name, prop.type, ref, prop.isOptional, prop.isInput))
+          is SCollection -> it.add(SCollection(prop.name, prop.type, ref, prop.isInput))
         }
       }
     }
   }
 }
+
+fun FcSchema.map(): Map<String, Any> = masters.values.map { it.name to it.map() }.toMap()
+
+fun SEntity.map(): Map<String, Any> = all.map { (key, prop) ->
+  key to when (prop) {
+    is SField -> mapOf(
+      "@type" to "field",
+      "type" to prop.type.name.toLowerCase(),
+      "optional" to prop.isOptional,
+      "input" to prop.isInput,
+      "unique" to prop.isUnique
+    )
+
+    is SReference -> mapOf(
+      "@type" to "ref",
+      "type" to prop.type.name.toLowerCase(),
+      "ref" to if (prop.type == RType.LINKED) prop.ref.name else prop.ref.map(),
+      "optional" to prop.isOptional,
+      "input" to prop.isInput
+    )
+
+    is SCollection -> mapOf(
+      "@type" to "col",
+      "type" to prop.type.name.toLowerCase(),
+      "ref" to if (prop.type == RType.LINKED) prop.ref.name else prop.ref.map(),
+      "input" to prop.isInput
+    )
+  }
+}.toMap()

@@ -30,6 +30,20 @@ object TypeEngine {
 
   private val oneOf = classToType.values.map { it.name.toLowerCase() }
 
+  fun tryConvertParam(type: FType, value: String): Any = when (type) {
+    FType.TEXT -> value
+    FType.INT -> value.toInt()
+    FType.LONG -> value.toLong()
+    FType.FLOAT -> value.toFloat()
+    FType.DOUBLE -> value.toDouble()
+    FType.BOOL -> value.toBoolean()
+    FType.TIME -> LocalTime.parse(value)
+    FType.DATE -> LocalDate.parse(value)
+    FType.DATETIME -> LocalDateTime.parse(value)
+    FType.LIST -> throw Exception("Unsupported type parameter: list") // TODO: add support
+    FType.MAP -> throw Exception("Unsupported type parameter: map") // TODO: add support
+  }
+
   fun convert(vType: KClass<Any>): FType = classToType[vType] ?:
     throw Exception("Expecting type one of $oneOf. Found ${vType.simpleName}.")
 

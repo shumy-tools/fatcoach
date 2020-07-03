@@ -1,14 +1,15 @@
 package fc.api
 
+import fc.api.input.Transaction
 import fc.api.query.Query
-import fc.api.security.IAuthorizer
+import fc.api.spi.IAuthorizer
 import fc.api.spi.IAdaptor
 
 class FcDatabase(private val adaptor: IAdaptor, private val authorizer: IAuthorizer? = null) {
   val schema: FcSchema
     get() = adaptor.schema
 
-  fun tx(transaction: FcTxData.() -> Unit) {
+  fun tx(transaction: FcTxData.() -> Unit): Transaction {
     if (!schema.committed)
       throw Exception("Cannot execute inputs on a non-committed schema!")
 
@@ -21,6 +22,7 @@ class FcDatabase(private val adaptor: IAdaptor, private val authorizer: IAuthori
     }
 
     adaptor.execInput(txData.tx)
+    return txData.tx
   }
 
   fun get(sEntity: SEntity, id: Long): FcData {

@@ -1,8 +1,6 @@
 package fc.api.input
 
 import fc.api.*
-import fc.api.spi.FcUpdate
-import fc.api.spi.InputInstructions
 import fc.dsl.input.UpdateBaseListener
 import fc.dsl.input.UpdateLexer
 import fc.dsl.input.UpdateParser
@@ -12,7 +10,7 @@ import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ErrorNode
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 
-internal class UpdateCompiler(private val dsl: String, private val schema: FcSchema, private val tx: InputInstructions, private val args: Map<String, Any>): UpdateBaseListener() {
+internal class UpdateCompiler(private val dsl: String, private val schema: FcSchema, private val tx: Transaction, private val args: Map<String, Any>): UpdateBaseListener() {
   val errors = mutableListOf<String>()
   init { compile() }
 

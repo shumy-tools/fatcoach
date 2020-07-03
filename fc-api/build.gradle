@@ -32,6 +32,7 @@ compileKotlin {
   dependsOn generateGrammarSource
 }
 
+
 clean.doLast {
   file('gen-src').deleteDir()
 }

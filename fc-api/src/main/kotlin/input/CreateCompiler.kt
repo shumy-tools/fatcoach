@@ -1,8 +1,6 @@
 package fc.api.input
 
 import fc.api.*
-import fc.api.spi.FcCreate
-import fc.api.spi.InputInstructions
 import fc.dsl.input.CreateBaseListener
 import fc.dsl.input.CreateLexer
 import fc.dsl.input.CreateParser
@@ -13,7 +11,7 @@ import org.antlr.v4.runtime.tree.ErrorNode
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import java.util.*
 
-internal class CreateCompiler(private val dsl: String, private val schema: FcSchema, private val tx: InputInstructions, private val args: Map<String, Any>): CreateBaseListener() {
+internal class CreateCompiler(private val dsl: String, private val schema: FcSchema, private val tx: Transaction, private val args: Map<String, Any>): CreateBaseListener() {
   val tree = RefTree()
   val errors = mutableListOf<String>()
 
