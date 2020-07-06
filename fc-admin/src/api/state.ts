@@ -1,15 +1,13 @@
 import Vue from 'vue'
+import { Schema, SEntity } from './client'
 
-export interface MenuItem {
-  text: string,
-  active: boolean,
-  route: string
-}
-
-export interface Menu {
-  title: string
-  icon?: string,
-  items: MenuItem[]
+export interface State {
+  schema: Schema,
+  crumbs: string[]
 }
 
 export const EventBus = new Vue()
+
+export default State
+
+

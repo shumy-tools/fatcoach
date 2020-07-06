@@ -87,6 +87,13 @@ class SEntity(val name: String, val type: EType) {
 
   init { id.entity = this }
 
+
+  val refs: List<SReference>
+    get() = rels.values.filterIsInstance<SReference>()
+
+  val cols: List<SCollection>
+    get() = rels.values.filterIsInstance<SCollection>()
+
   /* ------------------------- owned/linked -------------------------*/
   val ownedRefs: List<SReference>
     get() = rels.values.filterIsInstance<SReference>().filter { it.type == RType.OWNED }
@@ -252,32 +259,3 @@ fun SEntity.clone(): SEntity = SEntity(name, type).also {
     }
   }
 }
-
-fun FcSchema.map(): Map<String, Any> = masters.values.map { it.name to it.map() }.toMap()
-
-fun SEntity.map(): Map<String, Any> = all.map { (key, prop) ->
-  key to when (prop) {
-    is SField -> mapOf(
-      "@type" to "field",
-      "type" to prop.type.name.toLowerCase(),
-      "optional" to prop.isOptional,
-      "input" to prop.isInput,
-      "unique" to prop.isUnique
-    )
-
-    is SReference -> mapOf(
-      "@type" to "ref",
-      "type" to prop.type.name.toLowerCase(),
-      "ref" to if (prop.type == RType.LINKED) prop.ref.name else prop.ref.map(),
-      "optional" to prop.isOptional,
-      "input" to prop.isInput
-    )
-
-    is SCollection -> mapOf(
-      "@type" to "col",
-      "type" to prop.type.name.toLowerCase(),
-      "ref" to if (prop.type == RType.LINKED) prop.ref.name else prop.ref.map(),
-      "input" to prop.isInput
-    )
-  }
-}.toMap()

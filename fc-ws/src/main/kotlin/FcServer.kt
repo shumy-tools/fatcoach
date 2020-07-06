@@ -12,6 +12,7 @@ import io.javalin.http.Context
 import java.security.MessageDigest
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.collections.LinkedHashMap
 
 class FcServer(val adaptor: IAdaptor, val authorizer: IAuthorizer? = null) {
   private val cache = ConcurrentHashMap<String, Query>()
@@ -43,7 +44,15 @@ class FcServer(val adaptor: IAdaptor, val authorizer: IAuthorizer? = null) {
   }
 
   private fun schema(ctx: Context) = handle(ctx) {
-    val schema = adaptor.schema.map()
+    val all = adaptor.schema.map()
+    val masters = adaptor.schema.masters.keys
+
+    /*val packages = linkedMapOf<String, Any>()
+    adaptor.schema.all.keys.forEach {
+      packages.addToPackage(it)
+    }*/
+
+    val schema = mapOf("all" to all, "masters" to masters)
     mapOf("@type" to "ok").plus("result" to schema)
   }
 
@@ -118,3 +127,40 @@ private fun String.hash(): String {
   val bytes = digest.digest(compact.toByteArray())
   return Base64.getUrlEncoder().encodeToString(bytes)
 }
+
+fun FcSchema.map(): Map<String, Any> = all.values.map { it.name to mapOf(
+  "name" to it.name,
+  "type" to it.type.name.toLowerCase(),
+  "fields" to it.mapFields(),
+  "refs" to it.mapRefs(),
+  "cols" to it.mapCols()
+) }.toMap()
+
+fun SEntity.mapFields(): Map<String, Any> = fields.values.map {
+  it.name to mapOf(
+    "name" to it.name,
+    "type" to it.type.name.toLowerCase(),
+    "optional" to it.isOptional,
+    "input" to it.isInput,
+    "unique" to it.isUnique
+  )
+}.toMap()
+
+fun SEntity.mapRefs(): Map<String, Any> = refs.map {
+  it.name to mapOf(
+    "name" to it.name,
+    "type" to it.type.name.toLowerCase(),
+    "ref" to it.ref.name,
+    "optional" to it.isOptional,
+    "input" to it.isInput
+  )
+}.toMap()
+
+fun SEntity.mapCols(): Map<String, Any> = cols.map {
+  it.name to mapOf(
+    "name" to it.name,
+    "type" to it.type.name.toLowerCase(),
+    "ref" to it.ref.name,
+    "input" to it.isInput
+  )
+}.toMap()
