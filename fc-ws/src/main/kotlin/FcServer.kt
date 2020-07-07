@@ -12,7 +12,6 @@ import io.javalin.http.Context
 import java.security.MessageDigest
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.collections.LinkedHashMap
 
 class FcServer(val adaptor: IAdaptor, val authorizer: IAuthorizer? = null) {
   private val cache = ConcurrentHashMap<String, Query>()
@@ -57,10 +56,13 @@ class FcServer(val adaptor: IAdaptor, val authorizer: IAuthorizer? = null) {
   }
 
   private fun create(ctx: Context) = handle(ctx) {
+    val req = ctx.bodyAsClass(CodeRequest::class.java)
+    // TODO: convert params
+
     // TODO: check access control
     var tree: RefTree? = null
     val tx = db.tx {
-      tree = create(ctx.body())
+      tree = create(req.code)
     }
 
     // TODO: report tx instructions to all subscribers?
@@ -68,31 +70,38 @@ class FcServer(val adaptor: IAdaptor, val authorizer: IAuthorizer? = null) {
   }
 
   private fun update(ctx: Context) = handle(ctx) {
+    val req = ctx.bodyAsClass(CodeRequest::class.java)
+    // TODO: convert params
+
     // TODO: check access control
-    val tx = db.tx { update(ctx.body()) }
+    val tx = db.tx { update(req.code) }
 
     // TODO: report tx instructions to all subscribers?
     mapOf("@type" to "ok")
   }
 
   private fun delete(ctx: Context) = handle(ctx) {
+    val req = ctx.bodyAsClass(CodeRequest::class.java)
+    // TODO: convert params
+
     // TODO: check access control
-    val tx = db.tx { delete(ctx.body()) }
+    val tx = db.tx { delete(req.code) }
 
     // TODO: report tx instructions to all subscribers?
     mapOf("@type" to "ok")
   }
 
   private fun query(ctx: Context) = handle(ctx) {
+    val req = ctx.bodyAsClass(CodeRequest::class.java)
+
     // use compiled cache if exists
-    val hash = ctx.body().hash()
-    val query = cache.getOrPut(hash) { db.query(ctx.body()) }
+    val hash = req.code.hash()
+    val query = cache.getOrPut(hash) { db.query(req.code) }
 
     // check and convert input parameters
-    val params = if (query.parameters.isNotEmpty()) {
-      val qParams = ctx.queryParamMap()
+    val params = if (req.args.isNotEmpty()) {
       query.parameters.map {
-        val qParamValue = qParams[it.name]?.firstOrNull() ?: throw Exception("Expecting input parameter $it.")
+        val qParamValue = req.args[it.name] ?: throw Exception("Expecting input parameter $it.")
         val value = TypeEngine.tryConvertParam(it.type, qParamValue)
         it.name to value
       }.toMap()
@@ -105,6 +114,8 @@ class FcServer(val adaptor: IAdaptor, val authorizer: IAuthorizer? = null) {
 }
 
 /* ------------------------- helpers -------------------------*/
+data class CodeRequest(val code: String, val args: Map<String, String>)
+
 private fun handle(ctx: Context, handler: (Context) -> Map<String, Any>) {
   val res = try {
     handler(ctx)

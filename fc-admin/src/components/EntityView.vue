@@ -11,7 +11,7 @@
       <q-checkbox :value="prop.optional" label="Optional" class="col-1" />
       <q-checkbox :value="prop.unique" label="Unique" class="col-1" />
       <q-btn-group outline>
-        <q-btn icon="las la-tags" />
+        <q-btn icon="las la-cogs" />
         <q-btn icon="lar la-trash-alt" class="text-red" />
       </q-btn-group>
     </div>
@@ -29,7 +29,7 @@
       <q-checkbox :value="prop.input" label="Input"  class="col-1" />
       <q-checkbox :value="prop.optional" label="Optional" class="col-1" />
       <q-btn-group outline>
-        <q-btn icon="las la-tags" />
+        <q-btn icon="las la-cogs" />
         <q-btn icon="lar la-trash-alt" class="text-red" />
       </q-btn-group>
     </div>
@@ -46,7 +46,7 @@
 
       <q-checkbox :value="prop.input" label="Input" class="col-1" />
       <q-btn-group outline>
-        <q-btn icon="las la-tags" />
+        <q-btn icon="las la-cogs" />
         <q-btn icon="lar la-trash-alt" class="text-red" />
       </q-btn-group>
     </div>
@@ -60,7 +60,7 @@ import { SEntity } from '../api/client'
 
 @Component
 export default class EntityView extends Vue {
-  @Prop() entity?: SEntity
+  @Prop({ required: true }) readonly entity!: SEntity
 
   entities = Object.keys(this.$state.schema.all) //Object.keys(this.$state.schema.all).map(key => ({ name: key, type: this.$state.schema.all[key].type }))
 
@@ -80,12 +80,6 @@ export default class EntityView extends Vue {
 </script>
 
 <style lang="scss">
-.border-left {
-  border-left: $orange;
-  border-left-width: 5px;
-  border-left-style: solid;
-}
-
 .vertical-align-unset {
   vertical-align: unset !important;
 }

@@ -53,6 +53,15 @@ export class FcClient {
 
     return res.data.result
   }
+
+  async query (code: string, args: any): Promise<any> {
+    const res = await axios.post('api/query', { code, args })
+    if (res.data['@type'] !== 'ok') {
+      this.onError(res.data.result)
+    }
+
+    return res.data.result
+  }
 }
 
 export default FcClient

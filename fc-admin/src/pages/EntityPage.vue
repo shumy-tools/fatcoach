@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <q-page>
     <q-breadcrumbs class="q-pt-md q-px-md q-pb-xs">
       <template v-slot:separator>
         <q-icon name="chevron_right"/>
@@ -9,18 +9,17 @@
       <q-breadcrumbs-el v-for="(item, index) in $state.crumbs" :key="item" :label="item" icon="widgets" :class="{ 'cursor-pointer': (index != $state.crumbs.length - 1) }" clickable @click="navigate(item)" />
     </q-breadcrumbs>
 
-    <q-card class="q-ma-md no-border-radius">
-      <q-scroll-area style="height: calc(100vh - (58px + 41px + 2*16px))">
-        <q-tabs v-model="tab" dense class="text-grey" active-color="primary" indicator-color="primary" align="justify" narrow-indicator>
-            <q-tab name="schema" label="Schema" />
-            <q-tab name="alarms" label="Alarms" />
-            <q-tab name="movies" label="Movies" />
-        </q-tabs>
+    <q-card class="q-ma-md no-border-radius" style="height: calc(100vh - (58px + 41px + 2*16px))">
+      <q-tabs v-model="tab" dense class="text-grey text-weight-bold" active-color="orange" indicator-color="orange" align="justify">
+          <q-tab name="properties" label="Properties" />
+          <q-tab name="alarms" label="Alarms" />
+          <q-tab name="movies" label="Movies" />
+      </q-tabs>
+      <q-separator />
 
-        <q-separator />
-
+      <q-scroll-area style="height: calc(100vh - 168px)">
         <q-tab-panels v-model="tab" class="no-border-radius" animated>
-          <q-tab-panel name="schema">
+          <q-tab-panel name="properties">
             <entity-view :entity="entity" @navigate="navigate"/>
           </q-tab-panel>
 
@@ -36,7 +35,7 @@
         </q-tab-panels>
       </q-scroll-area>
     </q-card>
-  </div>
+  </q-page>
 </template>
 
 <script lang="ts">
@@ -46,7 +45,7 @@ import { SEntity } from '../api/client'
 
 @Component({ components: { EntityView } })
 export default class EntityPage extends Vue {
-  tab = 'schema'
+  tab = 'properties'
   entity?: SEntity
 
   navigate(ref: string) {
