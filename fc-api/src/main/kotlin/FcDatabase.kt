@@ -21,7 +21,7 @@ class FcDatabase(private val adaptor: IAdaptor, private val authorizer: IAuthori
       txData.tx.all.forEach { authorizer.canInput(it) }
     }
 
-    adaptor.execInput(txData.tx)
+    adaptor.execTransaction(txData.tx)
     return txData.tx
   }
 

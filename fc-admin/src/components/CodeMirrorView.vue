@@ -34,13 +34,20 @@ export default class CodeMirrorView extends Vue {
 
     if (this.code)
       editor.setValue(this.code)
+
+    console.log('Select: ', document.querySelector('CodeMirror-sizer'))
   }
 }
 /* eslint-enable */
 </script>
 
 <style lang="scss">
+.CodeMirror {
+  height: 100%;
+}
+
 .CodeMirror-sizer {
   min-height: 198px !important;
+  height: fit-content;
 }
 </style>

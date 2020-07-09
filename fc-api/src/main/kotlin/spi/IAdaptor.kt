@@ -12,6 +12,6 @@ interface IAdaptor {
   fun changeSchema(updated: FcSchema)
 
   fun getById(sEntity: SEntity, id: Long): FcData
-  fun execInput(instructions: Transaction)
+  fun execTransaction(instructions: Transaction)
   fun execQuery(query: QTree, args: Map<String, Any>): IResult
 }

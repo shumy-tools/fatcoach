@@ -2,7 +2,6 @@ package fc.api
 
 class RefID(id: Long? = null) {
   var id: Long? = id
-    internal set
 
   override fun toString() = hashCode().toString()
 }

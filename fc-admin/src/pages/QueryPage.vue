@@ -31,13 +31,13 @@
 
         <q-scroll-area style="height: calc(100vh - 460px)">
           <q-tab-panels v-model="tab" class="no-border-radius" animated>
-            <q-tab-panel name="ui" class="row no-wrap">
+            <q-tab-panel name="ui" class="q-pa-none">
               <div class="q-pa-md q-gutter-sm">
                 <div v-if="!result" class="text-center text-weight-bold text-uppercase">No results ...</div>
                 <q-tree v-if="result" :nodes="result" node-key="label" default-expand-all/>
               </div>
             </q-tab-panel>
-            <q-tab-panel name="json">
+            <q-tab-panel name="json" class="q-pa-none">
               <div v-if="!result" class="text-center text-weight-bold text-uppercase">no results ...</div>
               <code-mirror-view v-if="result" mode="json"></code-mirror-view>
             </q-tab-panel>

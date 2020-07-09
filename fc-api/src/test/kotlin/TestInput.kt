@@ -68,7 +68,7 @@ private class InputSecurity: IAuthorizer {
 
 private class TestInputAdaptor(override val schema: FcSchema) : TestAdaptor(schema) {
   private val session = ThreadLocal<Transaction>()
-  override fun execInput(instructions: Transaction) {
+  override fun execTransaction(instructions: Transaction) {
     session.set(instructions)
   }
 

@@ -85,7 +85,7 @@ class SEntity(val name: String, val type: EType) {
   val fields: Map<String, SField> = linkedMapOf()
   val rels: Map<String, SRelation> = linkedMapOf()
 
-  init { id.entity = this }
+  init { id.iEntity = this }
 
 
   val refs: List<SReference>
@@ -143,13 +143,13 @@ class SEntity(val name: String, val type: EType) {
   fun add(sProperty: SProperty) {
     checkChange()
 
-    if (sProperty.entity != null)
+    if (sProperty.iEntity != null)
       throw Exception("SProperty '${sProperty.name}' is already being used by a different SEntity '${sProperty.entity!!.name}'.")
 
     if (all.containsKey(sProperty.name))
       throw Exception("SProperty '${sProperty.name}' already exists in the SEntity '$name'.")
 
-    sProperty.entity = this
+    sProperty.iEntity = this
     (all as LinkedHashMap<String, SProperty>)[sProperty.name] = sProperty
 
     when (sProperty) {
@@ -177,7 +177,7 @@ class SEntity(val name: String, val type: EType) {
     (rels as LinkedHashMap<String, SRelation>).remove(name)
 
     val sProperty = (all as LinkedHashMap<String, SProperty>).remove(name)
-    sProperty?.entity = null
+    sProperty?.iEntity = null
   }
 
   override fun toString() = """SEntity(${name}):
@@ -186,7 +186,11 @@ class SEntity(val name: String, val type: EType) {
 }
 
 sealed class SProperty(val name: String, val isInput: Boolean) {
-  internal var entity: SEntity? = null
+  internal var iEntity: SEntity? = null
+
+  val entity: SEntity
+    get() = iEntity!!
+
   abstract fun simpleString(): String
 }
 

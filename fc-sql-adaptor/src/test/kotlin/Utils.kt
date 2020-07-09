@@ -1,5 +1,3 @@
-package fc.test
-
 import fc.api.FType.*
 import fc.api.FcData
 import fc.api.FcSchema
@@ -8,13 +6,6 @@ import fc.api.query.IResult
 import fc.api.query.QTree
 import fc.api.spi.IAdaptor
 import fc.api.input.Transaction
-
-open class TestAdaptor(override val schema: FcSchema) : IAdaptor {
-  override fun changeSchema(updated: FcSchema): Unit = throw Exception("Not used!")
-  override fun execQuery(query: QTree, args: Map<String, Any>): IResult = throw Exception("Not used!")
-  override fun getById(sEntity: SEntity, id: Long): FcData = throw Exception("Not used!")
-  override fun execTransaction(instructions: Transaction): Unit = throw Exception("Not used!")
-}
 
 fun createCorrectSchema() = FcSchema {
   /* -------------- fields -------------- */
@@ -66,3 +57,5 @@ fun createCorrectSchema() = FcSchema {
     })
   }
 }
+
+val schema = createCorrectSchema()

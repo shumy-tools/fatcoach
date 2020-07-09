@@ -21,11 +21,17 @@ sealed class FcInstruction(val entity: SEntity, val refID: RefID) {
 
 class FcCreate internal constructor(entity: SEntity, refID: RefID): FcInstruction(entity, refID) {
   internal lateinit var values: Map<String, Any?>
+  val properties: Map<SProperty, Any?>
+    get() = values.map { entity.all.getValue(it.key) to it.value }.toMap()
+
   override fun toString() = "FcCreate(${entity.name}) @id=$refID - ${values.text()}"
 }
 
 class FcUpdate internal constructor(entity: SEntity, refID: RefID): FcInstruction(entity, refID) {
   internal lateinit var values: Map<String, Any?>
+  val properties: Map<SProperty, Any?>
+    get() = values.map { entity.all.getValue(it.key) to it.value }.toMap()
+
   override fun toString() = "FcUpdate(${entity.name}) @id=$refID - ${values.text()}"
 }
 
