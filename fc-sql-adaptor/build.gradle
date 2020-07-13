@@ -3,4 +3,7 @@ dependencies {
   implementation 'org.jooq:jooq:3.13.1'
   implementation 'com.zaxxer:HikariCP:3.4.3'
   implementation 'com.h2database:h2:1.4.200'
+
+  implementation 'com.fasterxml.jackson.module:jackson-module-kotlin:2.11.0'
+  implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.11.0'
 }

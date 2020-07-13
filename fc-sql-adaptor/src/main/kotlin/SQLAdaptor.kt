@@ -15,8 +15,9 @@ import org.jooq.conf.Settings
 import org.jooq.impl.DSL.*
 import org.jooq.impl.SQLDataType
 import java.sql.SQLException
+import java.sql.Statement
 
-class SQLAdaptor(private val url: String): IAdaptor {
+class SQLAdaptor(private val url: String, private val sqlListener: ((String) -> Unit)? = null): IAdaptor {
   private val ds = HikariDataSource().also {
     it.jdbcUrl = url
     it.addDataSourceProperty("cachePrepStmts", true)
@@ -29,6 +30,7 @@ class SQLAdaptor(private val url: String): IAdaptor {
     .withExecuteLogging(true)
 
   private val db = using(ds, SQLDialect.H2, settings)
+  private var cSchema: FcSchema? = null
 
   init {
     if (db.selectOne().fetch().isEmpty())
@@ -36,7 +38,7 @@ class SQLAdaptor(private val url: String): IAdaptor {
   }
 
   override val schema: FcSchema
-    get() = TODO("Not yet implemented")
+    get() = cSchema!!
 
   override fun changeSchema(updated: FcSchema) {
     TODO("Not yet implemented")
@@ -60,20 +62,32 @@ class SQLAdaptor(private val url: String): IAdaptor {
             val mainDbFields = allProps.dbFields()
             val dbInsert = tx.insertInto(table(tableName), mainDbFields.keys)
               .values(mainDbFields.values)
-              .returning(idFn())
+              //.returning(idFn())
+
+            // jOOQ is not returning the generated key! Issue: https://github.com/jOOQ/jOOQ/issues/2943
+            var seq = 1
+            val stmt = conf.connectionProvider().acquire().prepareStatement(dbInsert.sql, Statement.RETURN_GENERATED_KEYS)
+            mainDbFields.values.forEach {
+              stmt.setObject(seq, it)
+              seq++
+            }
 
             print("  ${dbInsert.sql}; $mainDbFields")
-            val affectedRows = dbInsert.execute()
+            // FIX: val affectedRows = dbInsert.execute()
+            val affectedRows = stmt.executeUpdate()
             if (affectedRows != 1)
               throw Exception("Create instruction failed, unexpected number of rows affected!")
 
-            inst.refID.id = dbInsert.fetchOne() as Long? ?: throw Exception("Insert failed! No return $SID!")
+            // FIX: inst.refID.id = dbInsert.fetchOne() as Long? ?: throw Exception("Insert failed! No return $SID!")
+            val genKeys = stmt.generatedKeys
+            inst.refID.id = if (genKeys.next()) genKeys.getLong(1) else throw Exception("Insert failed! No return $SID!")
             println(" - $SID=${inst.refID.id}")
+            sqlListener?.invoke("${dbInsert.sql}; $mainDbFields - $SID=${inst.refID.id}")
 
             // ------------------------ aux-table inserts ------------------------
             allProps.mapRefs().forEach { (rel, refs) ->
               val auxTable = table(rel.sqlAuxTableName())
-              tx.link(auxTable, inst.refID, refs)
+              tx.link(auxTable, inst.refID, refs, sqlListener)
             }
           }
 
@@ -81,26 +95,30 @@ class SQLAdaptor(private val url: String): IAdaptor {
             val allProps = inst.properties
 
             // ------------------------ main update ------------------------
-            var dbUpdate = tx.update(table(tableName)) as UpdateSetMoreStep<*>
             val mainDbFields = allProps.dbFields()
-            mainDbFields.forEach { (field, value) ->
-              dbUpdate = dbUpdate.set(field, value)
+            if (mainDbFields.isNotEmpty()) {
+              var dbUpdate = tx.update(table(tableName)) as UpdateSetMoreStep<*>
+              mainDbFields.forEach { (field, value) ->
+                dbUpdate = dbUpdate.set(field, value)
+              }
+
+              val update = dbUpdate.where(idFn().eq(inst.refID.id))
+
+              println("  ${update.sql}; $mainDbFields - @id=${inst.refID.id}")
+              val affectedRows = update.execute()
+              if (affectedRows != 1)
+                throw Exception("Update instruction failed, unexpected number of rows affected!")
+
+              sqlListener?.invoke("${update.sql}; $mainDbFields - @id=${inst.refID.id}")
             }
-
-            val update = dbUpdate.where(idFn().eq(inst.refID.id))
-
-            println("  ${update.sql}; $mainDbFields - @id=${inst.refID.id}")
-            val affectedRows = update.execute()
-            if (affectedRows != 1)
-              throw Exception("Update instruction failed, unexpected number of rows affected!")
 
             // ------------------------ aux-table inserts ------------------------
             allProps.mapLinks().forEach { (rel, refs) ->
               val auxTable = table(rel.sqlAuxTableName())
               val toLink = refs.mapNotNull { if (it.oper == OType.ADD) it.refID else null }
               val toUnlink = refs.mapNotNull { if (it.oper == OType.DEL) it.refID else null }
-              tx.link(auxTable, inst.refID, toLink)
-              tx.unlink(auxTable, inst.refID, toUnlink)
+              if (toLink.isNotEmpty()) tx.link(auxTable, inst.refID, toLink, sqlListener)
+              if (toUnlink.isNotEmpty()) tx.unlink(auxTable, inst.refID, toUnlink, sqlListener)
             }
           }
 
@@ -111,6 +129,8 @@ class SQLAdaptor(private val url: String): IAdaptor {
             val affectedRows = dbDelete.execute()
             if (affectedRows != 1)
               throw Exception("Delete instruction failed, unexpected number of rows affected!")
+
+            sqlListener?.invoke("${dbDelete.sql}; - @id=${inst.refID.id}")
           }
         }
       }
@@ -132,13 +152,13 @@ class SQLAdaptor(private val url: String): IAdaptor {
       dbTable = dbTable.column(SID, SQLDataType.BIGINT.nullable(false).identity(true))
 
       // ----------------------------- set table fields -----------------------------
-      entity.all.values.filterIsInstance<SField>().forEach {
+      entity.fields.values.forEach {
         if (it.isUnique) dbTable.constraint(unique(it.name))
         dbTable = dbTable.column(it.name, it.type.toSqlType().nullable(it.isOptional))
       }
 
       // ----------------------------- set @parent field -----------------------------
-      entity.all.values.filterIsInstance<SReference>().filter { it.name == SPARENT }.forEach {
+      entity.refs.filter { it.name == SPARENT }.forEach {
         dbTable = dbTable.column(it.name, SQLDataType.BIGINT.nullable(false))
         val refDbTable = table(it.ref.sqlTableName())
         val fk = foreignKey(it.name).references(refDbTable)
@@ -146,17 +166,17 @@ class SQLAdaptor(private val url: String): IAdaptor {
       }
 
       // ----------------------------- set aux tables -----------------------------
-      entity.all.values.filterIsInstance<SRelation>().filter { it.name != SPARENT }.forEach {
+      entity.rels.values.filter { it.type == RType.LINKED && it.name != SPARENT }.forEach {
         val auxTable = table(it.sqlAuxTableName())
         var auxDbTable = db.createTable(auxTable)
         auxDbTable = auxDbTable.column(INV, SQLDataType.BIGINT.nullable(false))
         auxDbTable = auxDbTable.column(REF, SQLDataType.BIGINT.nullable(false))
 
-        val refDbTable = table(it.ref.sqlTableName())
+        val refTable = table(it.ref.sqlTableName())
         val invFk = foreignKey(INV).references(table)
-        val refFk = foreignKey(REF).references(refDbTable)
-        constraints.push(table, invFk)
-        constraints.push(table, refFk)
+        val refFk = foreignKey(REF).references(refTable)
+        constraints.push(auxTable, invFk)
+        constraints.push(auxTable, refFk)
 
         // set primary key and execute
         val dbFinal = auxDbTable.constraint(primaryKey(INV, REF))
@@ -171,6 +191,7 @@ class SQLAdaptor(private val url: String): IAdaptor {
     }
 
     constraints.alterTables(db)
+    cSchema = schema
   }
 
   /*

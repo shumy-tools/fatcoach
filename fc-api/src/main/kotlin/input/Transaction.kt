@@ -3,7 +3,6 @@ package fc.api.input
 import fc.api.RefID
 import fc.api.SEntity
 import fc.api.SProperty
-import fc.api.SRelation
 
 class Transaction {
   val all: List<FcInstruction> = mutableListOf()

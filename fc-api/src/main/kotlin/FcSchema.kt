@@ -87,7 +87,6 @@ class SEntity(val name: String, val type: EType) {
 
   init { id.iEntity = this }
 
-
   val refs: List<SReference>
     get() = rels.values.filterIsInstance<SReference>()
 
@@ -95,7 +94,7 @@ class SEntity(val name: String, val type: EType) {
     get() = rels.values.filterIsInstance<SCollection>()
 
   /* ------------------------- owned/linked -------------------------*/
-  val ownedRefs: List<SReference>
+  /*val ownedRefs: List<SReference>
     get() = rels.values.filterIsInstance<SReference>().filter { it.type == RType.OWNED }
 
   val linkedRefs: List<SReference>
@@ -106,6 +105,7 @@ class SEntity(val name: String, val type: EType) {
 
   val linkedCols: List<SCollection>
     get() = rels.values.filterIsInstance<SCollection>().filter { it.type == RType.LINKED }
+  */
 
   private fun checkChange() {
     if (schema == null)

@@ -15,16 +15,15 @@ const val INV = "@inv"
 
 fun SEntity.sqlTableName() = name.replace('.', '_')
 
-fun SRelation.sqlAuxTableName() = "${entity.sqlTableName()}_${name}_${ref.sqlTableName()}"
+fun SRelation.sqlAuxTableName() = "${entity.sqlTableName()}_${name}"
 
 fun Map<SProperty, Any?>.dbFields(): Map<Field<Any>, Any?> {
   val filtered = filter { (prop, _) -> prop is SField || prop is SReference && prop.name == SPARENT }
   return filtered.map { (prop, value) ->
-    val field = when (prop) {
-      is SField -> prop.fn()
-      is SRelation -> parentFn()
+    when (prop) {
+      is SField -> prop.fn() to SQLFieldConverter.save(prop, value)
+      is SRelation -> parentFn() to (value as RefID).id
     }
-    field to value
   }.toMap()
 }
 
@@ -87,20 +86,22 @@ fun SField.fn(prefix: String? = null): Field<Any> = if (prefix != null) {
   DSL.field(DSL.name(name), jType()) as Field<Any>
 }
 
-fun DSLContext.link(auxTable: Table<Record>, inv: RefID, refs: List<RefID>) {
+fun DSLContext.link(auxTable: Table<Record>, inv: RefID, refs: List<RefID>, sqlListener: ((String) -> Unit)? = null) {
   var dbInsert = insertInto(auxTable, listOf(invFn(), refFn()))
   val values = refs.map { inv.id to it.id }
   values.forEach {
     dbInsert = dbInsert.values(it.first, it.second)
   }
 
-  print("  ${dbInsert.sql}; $values")
+  println("  ${dbInsert.sql}; $values")
   val affectedRows = dbInsert.execute()
   if (affectedRows != refs.size)
     throw Exception("Create aux-table instruction failed, unexpected number of rows affected!")
+
+  sqlListener?.invoke("${dbInsert.sql}; $values")
 }
 
-fun DSLContext.unlink(auxTable: Table<Record>, inv: RefID, refs: List<RefID>) {
+fun DSLContext.unlink(auxTable: Table<Record>, inv: RefID, refs: List<RefID>, sqlListener: ((String) -> Unit)? = null) {
   val values = refs.map { it.id }
   val dbDelete = delete(auxTable).where(invFn().eq(inv.id).and(refFn().`in`(values)))
 
@@ -108,6 +109,8 @@ fun DSLContext.unlink(auxTable: Table<Record>, inv: RefID, refs: List<RefID>) {
   val affectedRows = dbDelete.execute()
   if (affectedRows != refs.size)
     throw Exception("Delete instruction failed, unexpected number of rows affected!")
+
+  sqlListener?.invoke("${dbDelete.sql}; - [${inv.id}, ${values}]")
 }
 
 private fun SField.jType(): Class<out Any> = when (type) {
@@ -135,6 +138,6 @@ fun FType.toSqlType(): DataType<out Any> = when (this) {
   TIME -> SQLDataType.LOCALTIME
   DATE -> SQLDataType.LOCALDATE
   DATETIME -> SQLDataType.LOCALDATETIME
-  MAP -> SQLDataType.VARCHAR
-  LIST -> SQLDataType.VARCHAR
+  MAP -> SQLDataType.JSON
+  LIST -> SQLDataType.JSON
 }
