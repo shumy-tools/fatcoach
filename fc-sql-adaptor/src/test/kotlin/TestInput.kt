@@ -1,26 +1,9 @@
+package fc.adaptor.test
+
 import fc.adaptor.sql.SQLAdaptor
 import fc.api.FcDatabase
 import fc.api.RefTree
 import org.junit.Test
-import kotlin.concurrent.getOrSet
-
-private val ctx = ThreadLocal<MutableList<String>>()
-
-private val sqlListener: (String) -> Unit = {
-  val instructions = ctx.getOrSet { mutableListOf() }
-  instructions.add(it)
-}
-
-private fun init() {
-  val instructions = ctx.getOrSet { mutableListOf() }
-  instructions.clear()
-}
-
-private fun check(index: Int, sql: String) {
-  val instructions = ctx.get()
-  //println("check ${instructions[index]} == $sql")
-  assert(instructions[index] == sql)
-}
 
 private val adaptor = SQLAdaptor("jdbc:h2:mem:InputTest", sqlListener).also {
   it.createSchema(schema)

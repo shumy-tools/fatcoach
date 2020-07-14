@@ -2,6 +2,7 @@ package fc.adaptor.sql
 
 import fc.api.*
 import fc.api.FType.*
+import fc.api.query.QSelect
 import org.jooq.*
 import org.jooq.impl.DSL
 import org.jooq.impl.SQLDataType
@@ -22,7 +23,7 @@ fun Map<SProperty, Any?>.dbFields(): Map<Field<Any>, Any?> {
   return filtered.map { (prop, value) ->
     when (prop) {
       is SField -> prop.fn() to SQLFieldConverter.save(prop, value)
-      is SRelation -> parentFn() to (value as RefID).id
+      is SRelation -> parentFn() as Field<Any> to (value as RefID).id
     }
   }.toMap()
 }
@@ -73,10 +74,10 @@ fun invFn(prefix: String? = null): Field<Long> = if (prefix != null) {
 }
 
 @Suppress("UNCHECKED_CAST")
-fun parentFn(prefix: String? = null): Field<Any> = if (prefix != null) {
-  DSL.field(DSL.name(prefix, SPARENT), java.lang.Long::class.java) as Field<Any>
+fun parentFn(prefix: String? = null): Field<Long> = if (prefix != null) {
+  DSL.field(DSL.name(prefix, SPARENT), java.lang.Long::class.java) as Field<Long>
 } else {
-  DSL.field(DSL.name(SPARENT), java.lang.Long::class.java) as Field<Any>
+  DSL.field(DSL.name(SPARENT), java.lang.Long::class.java) as Field<Long>
 }
 
 @Suppress("UNCHECKED_CAST")
@@ -112,6 +113,49 @@ fun DSLContext.unlink(auxTable: Table<Record>, inv: RefID, refs: List<RefID>, sq
 
   sqlListener?.invoke("${dbDelete.sql}; - [${inv.id}, ${values}]")
 }
+// --------------------------------------------------- query ---------------------------------------------------
+fun dbFields(selection: QSelect, prefix: String = MAIN) =
+  selection.fields.keys.filter { it.name != SID }.map { it.fn(prefix) }
+
+
+fun SelectQuery<Record>.parentJoin(rel: SRelation, prefix: String) {
+  val joinWith = DSL.table(rel.ref.sqlTableName()).asTable(rel.name)
+  val joinWhere = parentFn(prefix).eq(idFn(rel.name))
+  addJoin(joinWith, JoinType.LEFT_OUTER_JOIN, joinWhere)
+}
+
+fun SelectQuery<Record>.ownedJoin(rel: SRelation, prefix: String) {
+  val joinWith = DSL.table(rel.ref.sqlTableName()).asTable(rel.name)
+  val joinWhere = idFn(prefix).eq(parentFn(rel.name))
+  addJoin(joinWith, JoinType.LEFT_OUTER_JOIN, joinWhere)
+}
+
+fun SelectQuery<Record>.linkedJoin(rel: SRelation, prefix: String) {
+  val auxPrefix = "${prefix}_${rel.name}"
+
+  val auxJoinWith = DSL.table(rel.sqlAuxTableName()).asTable(auxPrefix)
+  val auxJoinWhere = idFn(prefix).eq(invFn(auxPrefix))
+  addJoin(auxJoinWith, JoinType.LEFT_OUTER_JOIN, auxJoinWhere)
+
+  val joinWith = DSL.table(rel.ref.sqlTableName()).asTable(rel.name)
+  val joinWhere = refFn(auxPrefix).eq(idFn(rel.name))
+  addJoin(joinWith, JoinType.LEFT_OUTER_JOIN, joinWhere)
+}
+
+/*
+fun dbOneToOne(selection: QSelect) = selection.relations.filter {
+  it.key is SReference && it.key.type == RType.OWNED
+}
+
+fun dbOneToMany(selection: QSelect) = selection.relations.filter {
+  it.key is SCollection && it.key.type == RType.OWNED
+}
+
+fun dbManyToMany(selection: QSelect) = selection.relations.mapNotNull {
+  val value = manyToMany[it.name]
+  if (value != null) it to value else null
+}.toMap()
+*/
 
 private fun SField.jType(): Class<out Any> = when (type) {
   TEXT -> java.lang.String::class.java

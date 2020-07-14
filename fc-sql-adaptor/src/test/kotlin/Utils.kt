@@ -1,11 +1,9 @@
+package fc.adaptor.test
+
+import fc.adaptor.sql.SQLAdaptor
 import fc.api.FType.*
-import fc.api.FcData
 import fc.api.FcSchema
-import fc.api.SEntity
-import fc.api.query.IResult
-import fc.api.query.QTree
-import fc.api.spi.IAdaptor
-import fc.api.input.Transaction
+import kotlin.concurrent.getOrSet
 
 fun createCorrectSchema() = FcSchema {
   /* -------------- fields -------------- */
@@ -59,3 +57,20 @@ fun createCorrectSchema() = FcSchema {
 }
 
 val schema = createCorrectSchema()
+
+val ctx = ThreadLocal<MutableList<String>>()
+
+val sqlListener: (String) -> Unit = {
+  val instructions = ctx.getOrSet { mutableListOf() }
+  instructions.add(it)
+}
+
+fun init() {
+  val instructions = ctx.getOrSet { mutableListOf() }
+  instructions.clear()
+}
+
+fun check(index: Int, sql: String) {
+  val instructions = ctx.get()
+  assert(instructions[index] == sql)
+}

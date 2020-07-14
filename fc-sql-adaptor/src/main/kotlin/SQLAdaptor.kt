@@ -138,9 +138,7 @@ class SQLAdaptor(private val url: String, private val sqlListener: ((String) -> 
     }
   }
 
-  override fun execQuery(query: QTree, args: Map<String, Any>): IResult {
-    TODO("Not yet implemented")
-  }
+  override fun execQuery(query: QTree, args: Map<String, Any>): IResult = SQLQueryExecutor(db, query, args).exec()
 
   fun createSchema(schema: FcSchema) {
     val constraints = TableConstraints()
