@@ -61,7 +61,7 @@ class QSelect(
   override fun toString() = SpaceStack.scope {
     """{
       ${if (fields.isNotEmpty()) "\n|${SpaceStack.spaces()}${fields.map{"${it.value} ${it.key.simpleString()}"}.joinToString("\n|${SpaceStack.spaces()}")}" else ""}
-      ${if (relations.isNotEmpty()) "\n|${SpaceStack.spaces()}${relations.map{"${it.key.entity!!.name}::${it.key.name} ${it.key.text()}${it.value}"}.joinToString("\n|${SpaceStack.spaces()}")}" else ""}
+      ${if (relations.isNotEmpty()) "\n|${SpaceStack.spaces()}${relations.map{"${it.key.entity.name}::${it.key.name} ${it.key.text()}${it.value}"}.joinToString("\n|${SpaceStack.spaces()}")}" else ""}
     |${SpaceStack.end()}}""".trimMargin()
   }
 }

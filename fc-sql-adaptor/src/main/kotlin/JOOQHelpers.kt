@@ -120,49 +120,37 @@ fun dbFields(selection: QSelect, prefix: String = MAIN) =
 
 
 fun SelectQuery<Record>.parentJoin(rel: SRelation, prefix: String) {
-  val joinWith = DSL.table(rel.ref.sqlTableName()).asTable(rel.name)
-  val joinWhere = parentFn(prefix).eq(idFn(rel.name))
+  val joinPrefix = "${MAIN}_${rel.name}"
+  val joinWith = DSL.table(rel.ref.sqlTableName()).asTable(joinPrefix)
+  val joinWhere = parentFn(prefix).eq(idFn(joinPrefix))
   addJoin(joinWith, JoinType.LEFT_OUTER_JOIN, joinWhere)
 }
 
 fun SelectQuery<Record>.ownedJoin(rel: SRelation, prefix: String) {
-  val joinWith = DSL.table(rel.ref.sqlTableName()).asTable(rel.name)
-  val joinWhere = idFn(prefix).eq(parentFn(rel.name))
+  val joinPrefix = "${MAIN}_${rel.name}"
+  val joinWith = DSL.table(rel.ref.sqlTableName()).asTable(joinPrefix)
+  val joinWhere = idFn(prefix).eq(parentFn(joinPrefix))
   addJoin(joinWith, JoinType.LEFT_OUTER_JOIN, joinWhere)
 }
 
 fun SelectQuery<Record>.linkedJoin(rel: SRelation, prefix: String) {
-  val auxPrefix = "${prefix}_${rel.name}"
-
+  val auxPrefix = "${prefix}_aux_${rel.name}"
   val auxJoinWith = DSL.table(rel.sqlAuxTableName()).asTable(auxPrefix)
   val auxJoinWhere = idFn(prefix).eq(invFn(auxPrefix))
   addJoin(auxJoinWith, JoinType.LEFT_OUTER_JOIN, auxJoinWhere)
 
-  val joinWith = DSL.table(rel.ref.sqlTableName()).asTable(rel.name)
-  val joinWhere = refFn(auxPrefix).eq(idFn(rel.name))
+  val joinPrefix = "${MAIN}_${rel.name}"
+  val joinWith = DSL.table(rel.ref.sqlTableName()).asTable(joinPrefix)
+  val joinWhere = refFn(auxPrefix).eq(idFn(joinPrefix))
   addJoin(joinWith, JoinType.LEFT_OUTER_JOIN, joinWhere)
 }
 
 fun SelectQuery<Record>.auxJoin(rel: SRelation) {
-  val auxJoinWith = DSL.table(rel.sqlAuxTableName()).asTable(rel.name)
-  val auxJoinWhere = refFn(rel.name).eq(idFn(MAIN))
+  val joinPrefix = "${MAIN}_${rel.name}"
+  val auxJoinWith = DSL.table(rel.sqlAuxTableName()).asTable(joinPrefix)
+  val auxJoinWhere = refFn(joinPrefix).eq(idFn(MAIN))
   addJoin(auxJoinWith, JoinType.LEFT_OUTER_JOIN, auxJoinWhere)
 }
-
-/*
-fun dbOneToOne(selection: QSelect) = selection.relations.filter {
-  it.key is SReference && it.key.type == RType.OWNED
-}
-
-fun dbOneToMany(selection: QSelect) = selection.relations.filter {
-  it.key is SCollection && it.key.type == RType.OWNED
-}
-
-fun dbManyToMany(selection: QSelect) = selection.relations.mapNotNull {
-  val value = manyToMany[it.name]
-  if (value != null) it to value else null
-}.toMap()
-*/
 
 private fun SField.jType(): Class<out Any> = when (type) {
   TEXT -> java.lang.String::class.java

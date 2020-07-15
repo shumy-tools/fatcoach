@@ -164,7 +164,24 @@ class TestQuery {
     }""")
 
     val res2 = query2.exec()
-    println(res2.rows.toString())
     assert(res2.rows.toString() == "[{@id=3, perms=[{@id=3, name=perm-3}, {@id=4, name=perm-4}]}]")
+  }
+
+  @Test fun testFilteredReferences() {
+    val query1 = db.query("""Address | country.name == "Portugal" | {
+      *,
+      country { * }
+    }""")
+
+    val res1 = query1.exec()
+    assert(res1.rows.toString() == "[{@id=1, city=Aveiro, country={@id=1, name=Portugal, code=PT}}]")
+
+    /*val query2 = db.query("""Address | country.name == "Portugal" | {
+      city
+    }""")
+
+    val res2 = query2.exec()
+    println(res2.rows.toString())
+    assert(res2.rows.toString() == "[{@id=1, city=Aveiro}]")*/
   }
 }

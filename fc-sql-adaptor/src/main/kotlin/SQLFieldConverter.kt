@@ -1,11 +1,46 @@
 package fc.adaptor.sql
 
-import com.google.gson.GsonBuilder
+import com.google.gson.*
+import com.google.gson.stream.JsonReader
+import com.google.gson.stream.JsonWriter
 import fc.api.FType
 import fc.api.SField
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+
+private class LocalDateTypeAdapter : TypeAdapter<LocalDate>() {
+  override fun write(out: JsonWriter, value: LocalDate) {
+    out.value(DateTimeFormatter.ISO_LOCAL_DATE.format(value))
+  }
+
+  override fun read(input: JsonReader): LocalDate = LocalDate.parse(input.nextString())
+}
+
+private class LocalTimeTypeAdapter : TypeAdapter<LocalTime>() {
+  override fun write(out: JsonWriter, value: LocalTime) {
+    out.value(DateTimeFormatter.ISO_LOCAL_TIME.format(value))
+  }
+
+  override fun read(input: JsonReader): LocalTime = LocalTime.parse(input.nextString())
+}
+
+private class LocalDateTimeTypeAdapter : TypeAdapter<LocalDateTime>() {
+  override fun write(out: JsonWriter, value: LocalDateTime) {
+    out.value(DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(value))
+  }
+
+  override fun read(input: JsonReader): LocalDateTime = LocalDateTime.parse(input.nextString())
+}
 
 object SQLFieldConverter {
-  val gson = GsonBuilder().enableComplexMapKeySerialization().create()
+  private val gson = GsonBuilder()
+    .registerTypeAdapter(LocalDate::class.java, LocalDateTypeAdapter().nullSafe())
+    .registerTypeAdapter(LocalTime::class.java, LocalTimeTypeAdapter().nullSafe())
+    .registerTypeAdapter(LocalDateTime::class.java, LocalDateTimeTypeAdapter().nullSafe())
+    .enableComplexMapKeySerialization()
+    .create()
 
   fun save(prop: SField, value: Any?): Any? = when (prop.type) {
     FType.LIST -> gson.toJson(value)

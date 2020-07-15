@@ -3,7 +3,6 @@ package fc.adaptor.sql
 import fc.api.*
 import fc.api.query.*
 import org.jooq.*
-import org.jooq.impl.DSL
 import org.jooq.impl.DSL.*
 import java.util.*
 import kotlin.collections.LinkedHashMap
@@ -64,14 +63,15 @@ class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, pri
     }
 
     if (filter != null)
-      addConditions(expression(filter, prefix, alias))
+      addConditions(expression(filter))
 
-    // one-to-one relations
+    // one-to-one relations (A.id --> B.@parent, , A -->@inv AB @ref--> B)
     val oneToOne = selection.relations.keys.filterIsInstance<SReference>()
     oneToOne.forEach {
       val qRel = selection.relations.getValue(it)
+      val sPrefix = "${prefix}_${it.name}"
       val sAlias = "$alias.${it.name}"
-      select(onlyId, qRel.select, qRel.filter, it.name, sAlias)
+      select(onlyId, qRel.select, qRel.filter, sPrefix, sAlias)
 
       when (it.type) {
         RType.OWNED -> ownedJoin(it, prefix)
@@ -88,9 +88,10 @@ class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, pri
       val auxRel = if (it.type == RType.LINKED) it else null
       val subQuery = SQLQueryExecutor(db, subTree, args, auxRel)
 
+      val sPrefix = "${prefix}_${it.name}"
       subQueries[it.name] = when (it.type) {
         RType.OWNED -> Pair(parentFn(MAIN), subQuery)
-        RType.LINKED -> Pair(invFn(it.name), subQuery)
+        RType.LINKED -> Pair(invFn(sPrefix), subQuery)
       }
     }
   }
@@ -126,11 +127,11 @@ class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, pri
     }
   }
 
-  private fun SelectQuery<Record>.expression(expr: QExpression, prefix: String, alias: String): Condition = if (expr.predicate != null) {
-    predicate(expr.predicate!!, prefix, alias)
+  private fun expression(expr: QExpression): Condition = if (expr.predicate != null) {
+    predicate(expr.predicate!!)
   } else {
-    val left = expression(expr.left!!, prefix, alias)
-    val right = expression(expr.right!!, prefix, alias)
+    val left = expression(expr.left!!)
+    val right = expression(expr.right!!)
 
     when(expr.oper!!) {
       OperType.OR -> left.or(right)
@@ -139,7 +140,7 @@ class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, pri
   }
 
   @Suppress("UNCHECKED_CAST")
-  private fun SelectQuery<Record>.predicate(pred: QPredicate, prefix: String, alias: String): Condition {
+  private fun predicate(pred: QPredicate): Condition {
     /*var sPrefix = sRelation?.name ?: MAIN // detect if it's an auxTable
     var sName = "_null_"
     for ((i, qDeref) in pred.path.withIndex()) {
@@ -183,247 +184,23 @@ class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, pri
       }
     }*/
 
-    val path = pred.end.fn(prefix)
+    var sPrefix = MAIN
+    for (rel in pred.path.dropLast(1)) {
+      sPrefix += "_${rel.name}"
+    }
+
+    val field = pred.end.fn(sPrefix)
     val value = (if (pred.param is QParameter) args.getValue((pred.param as QParameter).name) else pred.param)
     return when(pred.comp) {
-      CompType.EQUAL -> path.eq(value)
-      CompType.DIFFERENT -> path.ne(value)
-      CompType.MORE -> path.greaterThan(value)
-      CompType.LESS -> path.lessThan(value)
-      CompType.MORE_EQ -> path.greaterOrEqual(value)
-      CompType.LESS_EQ -> path.lessOrEqual(value)
-      CompType.IN -> path.`in`(value)
+      CompType.EQUAL -> field.eq(value)
+      CompType.DIFFERENT -> field.ne(value)
+      CompType.MORE -> field.greaterThan(value)
+      CompType.LESS -> field.lessThan(value)
+      CompType.MORE_EQ -> field.greaterOrEqual(value)
+      CompType.LESS_EQ -> field.lessOrEqual(value)
+      CompType.IN -> field.`in`(value)
     }
   }
-
-  /*
-  private fun SEntity.execute(selection: QSelect, filter: QExpression?) {
-    joinFields(selection)
-    joinTables(selection)
-
-    if (filter != null) conditions = expression(filter)
-
-    // compile one-to-many relations
-    val oneToMany = qTree.entity.dbOneToMany(qTree.select)
-    for ((sRef, qRef) in oneToMany) {
-      // add sub-query @A.id <-- B.@parent
-      val subTree = QTree(sRef.ref, qRef)
-      val subQuery = SQLQueryExecutor(db, subTree)
-      inverted[sRef.name] = Pair(sRef.fn(refTable, MAIN), subQuery)
-    }
-
-    // compile many-to-many relations
-    val manyToMany = qTree.entity.dbManyToMany(qTree.select)
-    for ((qRel, iRef) in manyToMany) {
-      val fp = qRel.select.fields.partition { it.name.startsWith(TRAITS) }
-
-      // simulate one-to-many via @A.id <-- @AX.inv (one-to-one AX.@ref --> B.@id)
-      val refSelect = QSelect(qRel.select.hasAll, fp.second, emptyList())
-      val refRels = qRel.select.relations.plus(QRelation(qRel.name, qRel.ref, null, null, null, refSelect))
-
-      val auxTable = tables.get(iRef.first.sEntity, iRef.first.sEntity.rels[qRel.name])
-      val auxSelect = QSelect(qRel.select.hasAll, fp.first, refRels)
-      val auxTree = QTree(auxTable, qRel.filter, qRel.limit, qRel.page, auxSelect)
-
-      val subQuery = SQLQueryExecutor(db, auxTree)
-      inverted[qRel.name] = Pair(invFn(MAIN), subQuery)
-    }
-  }
-
-  private fun buildQueryIds(params: Map<String, Any>) = db.selectQuery().apply {
-    addSelect(idFn(MAIN))
-    buildQueryParts(params)
-  }
-
-  private fun buildQuery(selection: QSelect, filter: QExpression?, params: Map<String, Any>) = db.selectQuery().apply {
-    val joinFields = joinFields(selection)
-    addSelect(joinFields)
-
-    addOrderBy(sortFields)
-
-    buildQueryParts(params)
-  }
-
-  private fun SelectQuery<Record>.buildQueryParts(mParams: Map<String, Any>) {
-    addFrom(qTable)
-    joinTables.values.forEach { addJoin(it.first, JoinType.LEFT_OUTER_JOIN, it.second) }
-
-    if (conditions != null) {
-      // needs to rebuild conditions with included values when "IN" clause is present!
-      if (hasInClause.get()) addConditions(qTree.entity.expression(qTree.filter!!, params = mParams)) else addConditions(conditions)
-    }
-
-    when {
-      qTree.page != null -> {
-        val limit = (if (qTree.limit!!.type == ParamType.INT) qTree.limit.value else mParams.remove(qTree.limit.value as String)) as Int
-        val page = (if (qTree.page.type == ParamType.INT) qTree.page.value else mParams.remove(qTree.page.value as String)) as Int
-
-        addLimit(limit)
-        addOffset((page - 1) * limit)
-      }
-
-      qTree.limit != null -> {
-        val limit = (if (qTree.limit.type == ParamType.INT) qTree.limit.value else mParams.remove(qTree.limit.value as String)) as Int
-        addLimit(limit)
-      }
-
-      else -> Unit
-    }
-  }
-
-  @Suppress("UNCHECKED_CAST")
-  private fun SEntity.joinFields(selection: QSelect, prefix: String = MAIN, alias: String = "") {
-    // only add ID if not an auxTable
-    if (sRelation == null) {
-      val idField = if (alias.isEmpty()) idFn(prefix) else idFn(prefix).`as`("$alias.$ID")
-      joinFields.add(idField as Field<Any>)
-    }
-
-    val fields = if (alias.isEmpty()) dbFields(selection, prefix) else dbFields(selection, prefix).map { it.`as`("$alias.${it.name}") }
-    joinFields.addAll(fields)
-
-    // order fields
-    val orderBy = selection.fields.filter { it.sort != SortType.NONE }.sortedBy { it.order }.map {
-      val field = it.fn(prefix)
-      if (it.sort == SortType.ASC) field.asc() else field.desc()
-    }
-    sortFields.addAll(orderBy)
-
-    // add direct-ref fields
-    val refs = dbOneToOne(selection)
-    for (qRel in refs.keys) {
-      val sAlias = if (sRelation == null) "$alias.${qRel.name}" else alias // compact auxTable
-      qRel.ref.joinFields(qRel.select, qRel.name, sAlias)
-    }
-
-    // add @parent fields
-    selection.parentRef?.let {
-      it.ref.joinFields(it.select, it.name, "$alias.${it.name}")
-    }
-  }
-
-  private fun SEntity.joinTables(selection: QSelect, prefix: String = MAIN) {
-    // one-to-one A.@ref_<rel> --> B.@id
-    val refs = dbOneToOne(selection)
-    for (dRef in refs.values) {
-      directJoin(dRef, prefix)
-    }
-
-    // one-to-one A.@super --> B.@id
-    if (selection.superRef != null) {
-      superJoin(prefix)
-    }
-
-    // one-to-one A.@parent --> B.@id
-    if (selection.parentRef != null) {
-      parentJoin(prefix)
-    }
-
-    for (qRel in refs.keys) {
-      qRel.ref.joinTables(qRel.select, qRel.name)
-    }
-  }
-
-  private fun SEntity.directJoin(dRef: TDirectRef, prefix: String) {
-    val rTable = table(dRef.rel.ref.sqlName()).asTable(dRef.rel.name)
-    val rField = dRef.fn(this, prefix)
-    val rId = idFn(dRef.rel.name)
-    joinTables[rTable.name] = (rTable to rField.eq(rId))
-  }
-
-  private fun SEntity.parentJoin(prefix: String) {
-    val dRef = parentRef!!
-    val rTable = table(dRef.refEntity.sqlName()).asTable(PARENT)
-
-    if (dRef.viaRef is TDirectRef) {
-      val rField = dRef.viaRef.fn(this, PARENT)
-      val rId = idFn(prefix)
-      joinTables[rTable.name] = (rTable to rField.eq(rId))
-    } else {
-      val rField = dRef.viaRef.fn(this, prefix)
-      val rId = idFn(PARENT)
-      joinTables[rTable.name] = (rTable to rField.eq(rId))
-    }
-  }
-
-  private fun SEntity.expression(expr: QExpression, params: MutableMap<String, Any> = mutableMapOf()): Condition = if (expr.predicate != null) {
-    predicate(expr.predicate, params)
-  } else {
-    val left = expression(expr.left!!)
-    val right = expression(expr.right!!)
-
-    when(expr.oper!!) {
-      OperType.OR -> left.or(right)
-      OperType.AND -> left.and(right)
-    }
-  }
-
-  @Suppress("UNCHECKED_CAST")
-  private fun SEntity.predicate(pred: QPredicate, params: MutableMap<String, Any>): Condition {
-    var sPrefix = sRelation?.name ?: MAIN // detect if it's an auxTable
-    var sName = "_null_"
-    for ((i, qDeref) in pred.path.withIndex()) {
-      when (qDeref.deref) {
-        DerefType.FIELD -> sName = qDeref.name
-
-        DerefType.ONE -> {
-          when (qDeref.name) {
-            SUPER -> qDeref.table.superJoin(sPrefix)
-            PARENT -> qDeref.table.parentJoin(sPrefix)
-            else -> {
-              val dRef = qDeref.table.oneToOne.getValue(qDeref.name)
-              qDeref.table.directJoin(dRef, sPrefix)
-            }
-          }
-
-          sPrefix = qDeref.name
-        }
-
-        DerefType.MANY -> {
-          val inPredicate = QPredicate(pred.path.drop(i + 1), pred.comp, pred.param)
-
-          qDeref.table.oneToMany[qDeref.name]?.let {
-            val refTable = tables.get(it.rel.ref)
-            val inSelect = db.select(it.fn(it.refTable))
-              .from(table(refTable.sqlName()).`as`(MAIN))
-              .where(refTable.predicate(inPredicate, params))
-            return idFn(sPrefix).`in`(inSelect)
-          }
-
-          qDeref.table.manyToMany[qDeref.name]?.let {
-            val auxTable = it.first
-            val refTable = tables.get(it.second)
-            val inSelect = db.select(invFn(MAIN))
-              .from(table(auxTable.sqlName()).`as`(MAIN))
-              .join(table(refTable.sqlName()).`as`(qDeref.name)).on(refFn(MAIN).eq(idFn(qDeref.name)))
-              .where(auxTable.predicate(inPredicate, params))
-            return idFn(sPrefix).`in`(inSelect)
-          }
-        }
-      }
-    }
-
-    val path = field(name(sPrefix, sName))
-    val value = if (pred.param.type == ParamType.PARAM) param(pred.param.value as String) else pred.param.value
-
-    return when(pred.comp) {
-      CompType.EQUAL -> path.eq(value)
-      CompType.DIFFERENT -> path.ne(value)
-      CompType.MORE -> path.greaterThan(value)
-      CompType.LESS -> path.lessThan(value)
-      CompType.MORE_EQ -> path.greaterOrEqual(value)
-      CompType.LESS_EQ -> path.lessOrEqual(value)
-      CompType.IN -> {
-        hasInClause.set(true)
-        if (pred.param.type == ParamType.PARAM) {
-          val inValues = params.remove(pred.param.value)
-          path.`in`(inValues)
-        } else {
-          path.`in`(value)
-        }
-      }
-    }
-  }*/
 }
 
 
