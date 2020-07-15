@@ -18,6 +18,7 @@ fun SEntity.sqlTableName() = name.replace('.', '_')
 
 fun SRelation.sqlAuxTableName() = "${entity.sqlTableName()}_${name}"
 
+@Suppress("UNCHECKED_CAST")
 fun Map<SProperty, Any?>.dbFields(): Map<Field<Any>, Any?> {
   val filtered = filter { (prop, _) -> prop is SField || prop is SReference && prop.name == SPARENT }
   return filtered.map { (prop, value) ->
@@ -142,6 +143,12 @@ fun SelectQuery<Record>.linkedJoin(rel: SRelation, prefix: String) {
   addJoin(joinWith, JoinType.LEFT_OUTER_JOIN, joinWhere)
 }
 
+fun SelectQuery<Record>.auxJoin(rel: SRelation) {
+  val auxJoinWith = DSL.table(rel.sqlAuxTableName()).asTable(rel.name)
+  val auxJoinWhere = refFn(rel.name).eq(idFn(MAIN))
+  addJoin(auxJoinWith, JoinType.LEFT_OUTER_JOIN, auxJoinWhere)
+}
+
 /*
 fun dbOneToOne(selection: QSelect) = selection.relations.filter {
   it.key is SReference && it.key.type == RType.OWNED
@@ -182,6 +189,6 @@ fun FType.toSqlType(): DataType<out Any> = when (this) {
   TIME -> SQLDataType.LOCALTIME
   DATE -> SQLDataType.LOCALDATE
   DATETIME -> SQLDataType.LOCALDATETIME
-  MAP -> SQLDataType.JSON
-  LIST -> SQLDataType.JSON
+  MAP -> SQLDataType.VARCHAR
+  LIST -> SQLDataType.VARCHAR
 }

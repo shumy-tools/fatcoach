@@ -34,6 +34,7 @@ fun createCorrectSchema() = FcSchema {
 
   master("User") {
     field("name", TEXT)
+    field("email", TEXT, isOptional = true)
     ownedRef("address", owned = detail("Address") {
       field("city", TEXT)
       linkedRef("country", Country)

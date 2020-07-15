@@ -1,28 +1,26 @@
 package fc.adaptor.sql
 
-import com.fasterxml.jackson.annotation.JsonInclude
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.SerializationFeature
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.google.gson.GsonBuilder
 import fc.api.FType
 import fc.api.SField
 
 object SQLFieldConverter {
-  private val mapper: ObjectMapper = jacksonObjectMapper()
-    .registerModule(JavaTimeModule())
-    .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-    .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+  val gson = GsonBuilder().enableComplexMapKeySerialization().create()
 
   fun save(prop: SField, value: Any?): Any? = when (prop.type) {
-    FType.LIST -> mapper.writeValueAsString(value)
-    FType.MAP -> mapper.writeValueAsString(value)
+    FType.LIST -> gson.toJson(value)
+    FType.MAP -> gson.toJson(value)
     else -> value
   }
 
   fun load(prop: SField, value: Any): Any = when (prop.type) {
-    FType.LIST -> mapper.readValue((value as String), List::class.java)
-    FType.MAP -> mapper.readValue((value as String), Map::class.java)
+    FType.LIST -> gson.fromJson(value.parse(), List::class.java)
+    FType.MAP -> gson.fromJson(value.parse(), Map::class.java)
     else -> value
+  }
+
+  private fun Any.parse(): String {
+    val res = (this as String)
+    return if (res.startsWith("\"")) res.substring(1, res.length - 1) else res
   }
 }

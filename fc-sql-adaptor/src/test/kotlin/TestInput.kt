@@ -84,6 +84,7 @@ class TestInput {
 
       userID = create("""User {
         name: "Alex",
+        email: null,
         address: {
           city: "Aveiro",
           country: ?country
@@ -108,7 +109,7 @@ class TestInput {
 
     check(0,"""insert into Country ("name", "code") values (cast(? as varchar), cast(? as varchar)); {"name"=Portugal, "code"=PT} - @id=${portugalID!!.root.id}""")
     check(1,"""insert into Country ("name", "code") values (cast(? as varchar), cast(? as varchar)); {"name"=Spain, "code"=ES} - @id=${spainID!!.root.id}""")
-    check(2,"""insert into User ("name") values (cast(? as varchar)); {"name"=Alex} - @id=${userID!!.root.id}""")
+    check(2,"""insert into User ("name", "email") values (cast(? as varchar), cast(? as varchar)); {"name"=Alex, "email"=null} - @id=${userID!!.root.id}""")
     check(3,"""insert into Address ("city", "@parent") values (cast(? as varchar), cast(? as bigint)); {"city"=Aveiro, "@parent"=${userID!!.root.id}} - @id=${addressID!!.root.id}""")
     check(4,"""insert into Address_country ("@inv", "@ref") values (cast(? as bigint), cast(? as bigint)); [(${addressID!!.root.id}, ${portugalID!!.root.id})]""")
     check(5,"""update Address set "city" = cast(? as varchar) where "@id" = cast(? as bigint); {"city"=Barcelona} - @id=${addressID!!.root.id}""")

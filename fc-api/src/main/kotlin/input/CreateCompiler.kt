@@ -104,8 +104,8 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
       is SField -> {
         when (prop.type) {
           FType.LIST -> ListProxy(this).parse()
-          FType.MAP -> throw Exception("Expecting an object for '${prop.entity!!.name}.${prop.name}'.")
-          else -> throw Exception("A list is not compatible with the type '${prop.type.name.toLowerCase()}' for '${prop.entity!!.name}.${prop.name}'.")
+          FType.MAP -> throw Exception("Expecting an object for '${prop.entity.name}.${prop.name}'.")
+          else -> throw Exception("A list is not compatible with the type '${prop.type.name.toLowerCase()}' for '${prop.entity.name}.${prop.name}'.")
         }
       }
 
@@ -114,7 +114,7 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
           val selfTree = selfStack.peek().first
           item().map {
             if (it.data() == null)
-              throw Exception("Expecting a collection of objects for '${prop.entity!!.name}.${prop.name}'.")
+              throw Exception("Expecting a collection of objects for '${prop.entity.name}.${prop.name}'.")
             scope(selfTree, prop) { it.data().processData() }
           }
         }
@@ -122,7 +122,7 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
         RType.LINKED -> item().map { FieldProxy(it.value(), args, false).processRefID(prop, false) }
       }
 
-      is SReference -> throw Exception("Expecting a reference for '${prop.entity!!.name}.${prop.name}'.")
+      is SReference -> throw Exception("Expecting a reference for '${prop.entity.name}.${prop.name}'.")
     }
   }
 }

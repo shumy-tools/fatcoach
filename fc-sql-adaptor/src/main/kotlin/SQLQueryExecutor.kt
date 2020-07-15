@@ -3,13 +3,14 @@ package fc.adaptor.sql
 import fc.api.*
 import fc.api.query.*
 import org.jooq.*
+import org.jooq.impl.DSL
 import org.jooq.impl.DSL.*
 import java.util.*
 import kotlin.collections.LinkedHashMap
 
-class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, private val args: Map<String, Any>) {
+class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, private val args: Map<String, Any>, private val auxRel: SRelation? = null) {
   private val qTable = table(qTree.entity.sqlTableName()).asTable(MAIN)
-  private val inverted = linkedMapOf<String, Pair<Field<Long>, SQLQueryExecutor>>()
+  private val subQueries = linkedMapOf<String, Pair<Field<Long>, SQLQueryExecutor>>()
 
   fun exec(): IResult = subExec()
 
@@ -21,6 +22,7 @@ class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, pri
     if (fk != null) {
       mainQuery.addSelect(fk)
       mainQuery.addConditions((fk as Field<Any>).`in`(topIds))
+      auxRel?.let { mainQuery.auxJoin(auxRel) }
     }
 
     // process results
@@ -31,7 +33,7 @@ class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, pri
     mainQuery.fetch().forEach { result.process(it, fk) }
 
     // add one-to-many and many-to-many results
-    inverted.forEach {
+    subQueries.forEach {
       val subResult = it.value.second.subExec(it.value.first, idsQuery) as SQLResult
       result.rowsWithIds.keys.forEach { pk ->
         val fkKeys = subResult.fkKeys[pk] // join results via "pk <-- fk"
@@ -64,6 +66,7 @@ class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, pri
     if (filter != null)
       addConditions(expression(filter, prefix, alias))
 
+    // one-to-one relations
     val oneToOne = selection.relations.keys.filterIsInstance<SReference>()
     oneToOne.forEach {
       val qRel = selection.relations.getValue(it)
@@ -76,7 +79,20 @@ class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, pri
       }
     }
 
-    //TODO: sub select!
+    // one-to-many and many-to-many relations (A.id <-- B.@parent, A <--@inv AB @ref--> B)
+    val toMany = selection.relations.keys.filterIsInstance<SCollection>()
+    toMany.forEach {
+      val qRel = selection.relations.getValue(it)
+      val subTree = QTree(it.ref, qRel)
+
+      val auxRel = if (it.type == RType.LINKED) it else null
+      val subQuery = SQLQueryExecutor(db, subTree, args, auxRel)
+
+      subQueries[it.name] = when (it.type) {
+        RType.OWNED -> Pair(parentFn(MAIN), subQuery)
+        RType.LINKED -> Pair(invFn(it.name), subQuery)
+      }
+    }
   }
 
   private fun SelectQuery<Record>.orderBy(selection: QSelect) {
