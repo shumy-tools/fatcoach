@@ -118,22 +118,28 @@ fun DSLContext.unlink(auxTable: Table<Record>, inv: RefID, refs: List<RefID>, sq
 fun dbFields(selection: QSelect, prefix: String = MAIN) =
   selection.fields.keys.filter { it.name != SID }.map { it.fn(prefix) }
 
+fun SelectQuery<Record>.auxJoin(rel: SRelation) {
+  val joinPrefix = "${MAIN}_${rel.name}"
+  val auxJoinWith = DSL.table(rel.sqlAuxTableName()).asTable(joinPrefix)
+  val auxJoinWhere = refFn(joinPrefix).eq(idFn(MAIN))
+  addJoin(auxJoinWith, JoinType.LEFT_OUTER_JOIN, auxJoinWhere)
+}
 
-fun SelectQuery<Record>.parentJoin(rel: SRelation, prefix: String) {
+fun SelectQuery<Record>.parentJoin(rel: SReference, prefix: String) {
   val joinPrefix = "${MAIN}_${rel.name}"
   val joinWith = DSL.table(rel.ref.sqlTableName()).asTable(joinPrefix)
   val joinWhere = parentFn(prefix).eq(idFn(joinPrefix))
   addJoin(joinWith, JoinType.LEFT_OUTER_JOIN, joinWhere)
 }
 
-fun SelectQuery<Record>.ownedJoin(rel: SRelation, prefix: String) {
+fun SelectQuery<Record>.ownedJoin(rel: SReference, prefix: String) {
   val joinPrefix = "${MAIN}_${rel.name}"
   val joinWith = DSL.table(rel.ref.sqlTableName()).asTable(joinPrefix)
   val joinWhere = idFn(prefix).eq(parentFn(joinPrefix))
   addJoin(joinWith, JoinType.LEFT_OUTER_JOIN, joinWhere)
 }
 
-fun SelectQuery<Record>.linkedJoin(rel: SRelation, prefix: String) {
+fun SelectQuery<Record>.linkedJoin(rel: SReference, prefix: String) {
   val auxPrefix = "${prefix}_aux_${rel.name}"
   val auxJoinWith = DSL.table(rel.sqlAuxTableName()).asTable(auxPrefix)
   val auxJoinWhere = idFn(prefix).eq(invFn(auxPrefix))
@@ -143,13 +149,6 @@ fun SelectQuery<Record>.linkedJoin(rel: SRelation, prefix: String) {
   val joinWith = DSL.table(rel.ref.sqlTableName()).asTable(joinPrefix)
   val joinWhere = refFn(auxPrefix).eq(idFn(joinPrefix))
   addJoin(joinWith, JoinType.LEFT_OUTER_JOIN, joinWhere)
-}
-
-fun SelectQuery<Record>.auxJoin(rel: SRelation) {
-  val joinPrefix = "${MAIN}_${rel.name}"
-  val auxJoinWith = DSL.table(rel.sqlAuxTableName()).asTable(joinPrefix)
-  val auxJoinWhere = refFn(joinPrefix).eq(idFn(MAIN))
-  addJoin(auxJoinWith, JoinType.LEFT_OUTER_JOIN, auxJoinWhere)
 }
 
 private fun SField.jType(): Class<out Any> = when (type) {

@@ -176,12 +176,13 @@ class TestQuery {
     val res1 = query1.exec()
     assert(res1.rows.toString() == "[{@id=1, city=Aveiro, country={@id=1, name=Portugal, code=PT}}]")
 
-    /*val query2 = db.query("""Address | country.name == "Portugal" | {
+
+    val query2 = db.query("""Address | country.name == "Portugal" | {
       city
     }""")
 
     val res2 = query2.exec()
     println(res2.rows.toString())
-    assert(res2.rows.toString() == "[{@id=1, city=Aveiro}]")*/
+    assert(res2.rows.toString() == "[{@id=1, city=Aveiro}]")
   }
 }

@@ -174,6 +174,10 @@ internal class QueryCompiler(private val dsl: String, private val schema: FcSche
       val prop = it.text
       val sProperty = ctx.all[prop] ?: if (prop == SID) ctx.id else null
 
+      // TODO: support SCollection paths?!
+      if (sProperty is SCollection)
+        throw Exception("Non supported paths with collections!")
+
       // first and middle token requires a SRelation
       if (index < full.size - 1 && sProperty !is SRelation) {
         val oneOf = ctx.rels.map { it.key }

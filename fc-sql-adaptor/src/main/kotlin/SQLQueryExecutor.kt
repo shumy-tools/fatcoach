@@ -9,13 +9,13 @@ import kotlin.collections.LinkedHashMap
 
 class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, private val args: Map<String, Any>, private val auxRel: SRelation? = null) {
   private val qTable = table(qTree.entity.sqlTableName()).asTable(MAIN)
+  private val refJoins = mutableSetOf<SReference>()
   private val subQueries = linkedMapOf<String, Pair<Field<Long>, SQLQueryExecutor>>()
 
   fun exec(): IResult = subExec()
 
   @Suppress("UNCHECKED_CAST")
   fun subExec(fk: Field<Long>? = null, topIds: Select<*>? = null): IResult {
-    val idsQuery = query(true)
     val mainQuery = query(false)
 
     if (fk != null) {
@@ -32,13 +32,16 @@ class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, pri
     mainQuery.fetch().forEach { result.process(it, fk) }
 
     // add one-to-many and many-to-many results
-    subQueries.forEach {
-      val subResult = it.value.second.subExec(it.value.first, idsQuery) as SQLResult
-      result.rowsWithIds.keys.forEach { pk ->
-        val fkKeys = subResult.fkKeys[pk] // join results via "pk <-- fk"
-        fkKeys?.forEach { subID ->
-          val line = subResult.rowsWithIds[subID]!!
-          result.addTo(pk, it.key, line)
+    if (subQueries.isNotEmpty()) {
+      val idsQuery = query(true)
+      subQueries.forEach {
+        val subResult = it.value.second.subExec(it.value.first, idsQuery) as SQLResult
+        result.rowsWithIds.keys.forEach { pk ->
+          val fkKeys = subResult.fkKeys[pk] // join results via "pk <-- fk"
+          fkKeys?.forEach { subID ->
+            val line = subResult.rowsWithIds[subID]!!
+            result.addTo(pk, it.key, line)
+          }
         }
       }
     }
@@ -47,6 +50,7 @@ class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, pri
   }
 
   private fun query(onlyId: Boolean) = db.selectQuery().apply {
+    refJoins.clear()
     addFrom(qTable)
     select(onlyId, qTree.select, qTree.filter, MAIN, "")
     orderBy(qTree.select)
@@ -72,11 +76,7 @@ class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, pri
       val sPrefix = "${prefix}_${it.name}"
       val sAlias = "$alias.${it.name}"
       select(onlyId, qRel.select, qRel.filter, sPrefix, sAlias)
-
-      when (it.type) {
-        RType.OWNED -> ownedJoin(it, prefix)
-        RType.LINKED -> if (it.name == SPARENT) parentJoin(it, prefix) else linkedJoin(it, prefix)
-      }
+      refJoin(it, prefix)
     }
 
     // one-to-many and many-to-many relations (A.id <-- B.@parent, A <--@inv AB @ref--> B)
@@ -127,7 +127,7 @@ class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, pri
     }
   }
 
-  private fun expression(expr: QExpression): Condition = if (expr.predicate != null) {
+  private fun SelectQuery<Record>.expression(expr: QExpression): Condition = if (expr.predicate != null) {
     predicate(expr.predicate!!)
   } else {
     val left = expression(expr.left!!)
@@ -140,53 +140,12 @@ class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, pri
   }
 
   @Suppress("UNCHECKED_CAST")
-  private fun predicate(pred: QPredicate): Condition {
-    /*var sPrefix = sRelation?.name ?: MAIN // detect if it's an auxTable
-    var sName = "_null_"
-    for ((i, qDeref) in pred.path.withIndex()) {
-      when (qDeref.deref) {
-        DerefType.FIELD -> sName = qDeref.name
-
-        DerefType.ONE -> {
-          when (qDeref.name) {
-            SUPER -> qDeref.table.superJoin(sPrefix)
-            PARENT -> qDeref.table.parentJoin(sPrefix)
-            else -> {
-              val dRef = qDeref.table.oneToOne.getValue(qDeref.name)
-              qDeref.table.directJoin(dRef, sPrefix)
-            }
-          }
-
-          sPrefix = qDeref.name
-        }
-
-        DerefType.MANY -> {
-          val inPredicate = QPredicate(pred.path.drop(i + 1), pred.comp, pred.param)
-
-          qDeref.table.oneToMany[qDeref.name]?.let {
-            val refTable = tables.get(it.rel.ref)
-            val inSelect = db.select(it.fn(it.refTable))
-              .from(table(refTable.sqlName()).`as`(MAIN))
-              .where(refTable.predicate(inPredicate, params))
-            return idFn(sPrefix).`in`(inSelect)
-          }
-
-          qDeref.table.manyToMany[qDeref.name]?.let {
-            val auxTable = it.first
-            val refTable = tables.get(it.second)
-            val inSelect = db.select(invFn(MAIN))
-              .from(table(auxTable.sqlName()).`as`(MAIN))
-              .join(table(refTable.sqlName()).`as`(qDeref.name)).on(refFn(MAIN).eq(idFn(qDeref.name)))
-              .where(auxTable.predicate(inPredicate, params))
-            return idFn(sPrefix).`in`(inSelect)
-          }
-        }
-      }
-    }*/
-
+  private fun SelectQuery<Record>.predicate(pred: QPredicate): Condition {
     var sPrefix = MAIN
-    for (rel in pred.path.dropLast(1)) {
-      sPrefix += "_${rel.name}"
+    val path = pred.path.dropLast(1).filterIsInstance<SReference>()
+    path.forEach {
+      sPrefix += "_${it.name}"
+      refJoin(it, MAIN)
     }
 
     val field = pred.end.fn(sPrefix)
@@ -199,6 +158,17 @@ class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, pri
       CompType.MORE_EQ -> field.greaterOrEqual(value)
       CompType.LESS_EQ -> field.lessOrEqual(value)
       CompType.IN -> field.`in`(value)
+    }
+  }
+
+  private fun SelectQuery<Record>.refJoin(sRef: SReference, prefix: String) {
+    println("${sRef.name} - $refJoins")
+    if (!refJoins.contains(sRef)) {
+      refJoins.add(sRef)
+      when (sRef.type) {
+        RType.OWNED -> ownedJoin(sRef, prefix)
+        RType.LINKED -> if (sRef.name == SPARENT) parentJoin(sRef, prefix) else linkedJoin(sRef, prefix)
+      }
     }
   }
 }
