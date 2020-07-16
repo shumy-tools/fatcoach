@@ -1,21 +1,9 @@
 package fc.admin
 
+import fc.adaptor.sql.SQLAdaptor
 import fc.api.FType
-import fc.api.FcData
 import fc.api.FcSchema
-import fc.api.SEntity
-import fc.api.input.Transaction
-import fc.api.query.IResult
-import fc.api.query.QTree
-import fc.api.spi.IAdaptor
 import fc.ws.FcServer
-
-open class TestAdaptor(override val schema: FcSchema) : IAdaptor {
-  override fun changeSchema(updated: FcSchema): Unit = throw Exception("Not used!")
-  override fun execQuery(query: QTree, args: Map<String, Any>): IResult = throw Exception("Not used!")
-  override fun getById(sEntity: SEntity, id: Long): FcData = throw Exception("Not used!")
-  override fun execTransaction(instructions: Transaction): Unit = throw Exception("Not used!")
-}
 
 fun main() {
   val schema = FcSchema {
@@ -69,6 +57,9 @@ fun main() {
     }
   }
 
-  val adaptor = TestAdaptor(schema)
+  val adaptor = SQLAdaptor("jdbc:h2:mem:AdminTest").also {
+    it.createSchema(schema)
+  }
+
   FcServer(adaptor).start(9090)
 }

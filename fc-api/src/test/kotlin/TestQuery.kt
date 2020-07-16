@@ -130,7 +130,7 @@ class TestQuery {
   }
 
   @Test fun testCollections() {
-    db.query("""Role | name == "Admin" or details.name == "AdminProxy" | {
+    db.query("""Role | name == "Admin" | {
       @id,
       details {
         *,
@@ -140,7 +140,7 @@ class TestQuery {
       }
     }""").exec()
     security.check("[Role::(long@@id), Role::(RoleDetail@details), RoleDetail::(long@@id), RoleDetail::(text@name), RoleDetail::(bool@active), RoleDetail::(Permission@perms), Permission::(long@@id), Permission::(text@url), Permission::(text@name), Role::(text@name)]")
-    adaptor.check("""QTree(Role) | Role::[(text@name)] equal (text@Admin) or Role::[(RoleDetail@details), (text@name)] equal (text@AdminProxy) | {
+    adaptor.check("""QTree(Role) | Role::[(text@name)] equal (text@Admin) | {
     |  (none 0) (long@@id)
     |  Role::details -< RoleDetail {
     |    (none 0) (text@name)

@@ -6,6 +6,12 @@ import fc.api.FcSchema
 import kotlin.concurrent.getOrSet
 
 fun createCorrectSchema() = FcSchema {
+  master("Ordered") {
+    field("aText", TEXT)
+    field("aFloat", FLOAT)
+    field("aDateTime", DATETIME)
+  }
+
   /* -------------- fields -------------- */
   master("Simple") {
     field("aText", TEXT)

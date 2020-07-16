@@ -131,12 +131,14 @@ class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, pri
     predicate(expr.predicate!!)
   } else {
     val left = expression(expr.left!!)
-    val right = expression(expr.right!!)
 
-    when(expr.oper!!) {
-      OperType.OR -> left.or(right)
-      OperType.AND -> left.and(right)
-    }
+    if (expr.right != null) {
+      val right = expression(expr.right!!)
+      when(expr.oper!!) {
+        OperType.OR -> left.or(right)
+        OperType.AND -> left.and(right)
+      }
+    } else left
   }
 
   @Suppress("UNCHECKED_CAST")
@@ -162,7 +164,6 @@ class SQLQueryExecutor(private val db: DSLContext, private val qTree: QTree, pri
   }
 
   private fun SelectQuery<Record>.refJoin(sRef: SReference, prefix: String) {
-    println("${sRef.name} - $refJoins")
     if (!refJoins.contains(sRef)) {
       refJoins.add(sRef)
       when (sRef.type) {
@@ -250,7 +251,7 @@ class SQLResult(private val entity: SEntity): IResult {
   }
 
   private fun convert(sEntity: SEntity, field: String, value: Any): Any {
-    println("(${sEntity.name}::$field, $value)")
+    //println("(${sEntity.name}::$field, $value)")
     return if (field != SID) {
       val sField = sEntity.fields.getValue(field)
       SQLFieldConverter.load(sField, value)
