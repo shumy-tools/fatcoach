@@ -20,10 +20,10 @@ fun SRelation.sqlAuxTableName() = "${entity.sqlTableName()}_${name}"
 
 @Suppress("UNCHECKED_CAST")
 fun Map<SProperty, Any?>.dbFields(): Map<Field<Any>, Any?> {
-  val filtered = filter { (prop, _) -> prop is SField || prop is SReference && prop.name == SPARENT }
+  val filtered = filter { (prop, _) -> prop is SField<*> || prop is SReference && prop.name == SPARENT }
   return filtered.map { (prop, value) ->
     when (prop) {
-      is SField -> prop.fn() to SQLFieldConverter.save(prop, value)
+      is SField<*> -> prop.fn() to SQLFieldConverter.save(prop, value)
       is SRelation -> parentFn() as Field<Any> to (value as RefID).id
     }
   }.toMap()
@@ -82,7 +82,7 @@ fun parentFn(prefix: String? = null): Field<Long> = if (prefix != null) {
 }
 
 @Suppress("UNCHECKED_CAST")
-fun SField.fn(prefix: String? = null): Field<Any> = if (prefix != null) {
+fun SField<*>.fn(prefix: String? = null): Field<Any> = if (prefix != null) {
   DSL.field(DSL.name(prefix, name), jType()) as Field<Any>
 } else {
   DSL.field(DSL.name(name), jType()) as Field<Any>
@@ -151,7 +151,7 @@ fun SelectQuery<Record>.linkedJoin(rel: SReference, prefix: String) {
   addJoin(joinWith, JoinType.LEFT_OUTER_JOIN, joinWhere)
 }
 
-private fun SField.jType(): Class<out Any> = when (type) {
+private fun SField<*>.jType(): Class<out Any> = when (type) {
   TEXT -> java.lang.String::class.java
   INT -> java.lang.Integer::class.java
   LONG -> java.lang.Long::class.java

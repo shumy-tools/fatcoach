@@ -39,7 +39,7 @@ class QExpression(
 class QPredicate(
   val start: SEntity,
   val path: List<SProperty>,
-  val end: SField,
+  val end: SField<*>,
 
   val comp: CompType,
   val param: Any?                // expecting the 'end' type or QParameter
@@ -50,7 +50,7 @@ class QPredicate(
 
 // ----------- select structure -----------
 class QSelect(
-  val fields: Map<SField, QField>,
+  val fields: Map<SField<*>, QField>,
   val relations: Map<SRelation, QRelation>
 ) {
   private fun SRelation.text() = when (this) {

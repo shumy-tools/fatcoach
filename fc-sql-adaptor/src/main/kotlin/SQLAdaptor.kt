@@ -151,8 +151,8 @@ class SQLAdaptor(private val url: String, private val sqlListener: ((String) -> 
 
       // ----------------------------- set table fields -----------------------------
       entity.fields.values.forEach {
-        if (it.isUnique) dbTable.constraint(unique(it.name))
-        dbTable = dbTable.column(it.name, it.type.toSqlType().nullable(it.isOptional))
+        if (it.unique) dbTable.constraint(unique(it.name))
+        dbTable = dbTable.column(it.name, it.type.toSqlType().nullable(it.optional))
       }
 
       // ----------------------------- set @parent field -----------------------------

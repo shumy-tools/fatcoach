@@ -151,9 +151,9 @@ fun SEntity.mapFields(): Map<String, Any> = fields.values.map {
   it.name to mapOf(
     "name" to it.name,
     "type" to it.type.name.toLowerCase(),
-    "optional" to it.isOptional,
-    "input" to it.isInput,
-    "unique" to it.isUnique
+    "optional" to it.optional,
+    "input" to it.input,
+    "unique" to it.unique
   )
 }.toMap()
 
@@ -162,8 +162,8 @@ fun SEntity.mapRefs(): Map<String, Any> = refs.map {
     "name" to it.name,
     "type" to it.type.name.toLowerCase(),
     "ref" to it.ref.name,
-    "optional" to it.isOptional,
-    "input" to it.isInput
+    "optional" to it.optional,
+    "input" to it.input
   )
 }.toMap()
 
@@ -172,6 +172,6 @@ fun SEntity.mapCols(): Map<String, Any> = cols.map {
     "name" to it.name,
     "type" to it.type.name.toLowerCase(),
     "ref" to it.ref.name,
-    "input" to it.isInput
+    "input" to it.input
   )
 }.toMap()

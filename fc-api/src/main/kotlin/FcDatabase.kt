@@ -10,9 +10,6 @@ class FcDatabase(private val adaptor: IAdaptor, private val authorizer: IAuthori
     get() = adaptor.schema
 
   fun tx(transaction: FcTxData.() -> Unit): Transaction {
-    if (!schema.committed)
-      throw Exception("Cannot execute inputs on a non-committed schema!")
-
     val txData = FcTxData(schema)
     transaction(txData)
 
@@ -26,9 +23,6 @@ class FcDatabase(private val adaptor: IAdaptor, private val authorizer: IAuthori
   }
 
   fun get(sEntity: SEntity, id: Long): FcData {
-    if (!schema.committed)
-      throw Exception("Cannot execute a get on a non-committed schema!")
-
     // check security constraints
     val accessedFields = setOf(sEntity.id).plus(sEntity.fields.values)
     authorizer?.canQuery(accessedFields)
@@ -37,9 +31,6 @@ class FcDatabase(private val adaptor: IAdaptor, private val authorizer: IAuthori
   }
 
   fun query(dsl: String): Query {
-    if (!schema.committed)
-      throw Exception("Cannot execute a query on a non-committed schema!")
-
     val query = Query(dsl, adaptor)
 
     // check security constraints

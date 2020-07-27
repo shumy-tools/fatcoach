@@ -24,7 +24,7 @@ private class QuerySecurity: IAuthorizer {
 
   fun check(props: String) = assert(session.get().text() == props)
   fun print() = println("Access: ${session.get().text()}")
-  private fun Set<SProperty>.text() = map{"${it.entity!!.name}::${it.simpleString()}"}.toString()
+  private fun Set<SProperty>.text() = map{"${it.entity.name}::${it.simpleString()}"}.toString()
 }
 
 private class TestQueryAdaptor(override val schema: FcSchema) : TestAdaptor(schema) {

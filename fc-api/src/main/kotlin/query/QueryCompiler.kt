@@ -116,7 +116,7 @@ internal class QueryCompiler(private val dsl: String, private val schema: FcSche
     }.toMap()
   }
 
-  private fun FieldsContext.processFields(): Map<SField, QField> {
+  private fun FieldsContext.processFields(): Map<SField<*>, QField> {
     val sEntity = stack.peek()
     return if (ALL() != null) {
       sEntity.fields.values.map {
@@ -185,7 +185,7 @@ internal class QueryCompiler(private val dsl: String, private val schema: FcSche
       }
 
       // last token requires a SField
-      if (index == full.size - 1 && sProperty !is SField) {
+      if (index == full.size - 1 && sProperty !is SField<*>) {
         val oneOf = listOf(SID).plus(ctx.fields.map { it.key })
         throw Exception("Invalid path termination '${ctx.name}:$prop'. Please complete the path with one of $oneOf")
       }
@@ -199,7 +199,7 @@ internal class QueryCompiler(private val dsl: String, private val schema: FcSche
     }
 
     // path termination is already checked, this is a SField
-    val end = path.last() as SField
+    val end = path.last() as SField<*>
 
     // process comparator and parameters
     val compType = compType(comp().text)
@@ -208,7 +208,7 @@ internal class QueryCompiler(private val dsl: String, private val schema: FcSche
     return QPredicate(start, path, end, compType, params)
   }
 
-  private fun SField.processParameter(qParam: Any?): Any? = when {
+  private fun SField<*>.processParameter(qParam: Any?): Any? = when {
     qParam is Parameter -> addParameter(QParameter(qParam.value, type))
     qParam is List<*> -> qParam.map { processParameter(it) }
     qParam != null -> { tryType(TypeEngine.convert(qParam.javaClass.kotlin)); qParam }

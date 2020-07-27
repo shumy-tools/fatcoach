@@ -1,7 +1,6 @@
 package fc.admin
 
 import fc.adaptor.sql.SQLAdaptor
-import fc.api.FType
 import fc.api.FcSchema
 import fc.ws.FcServer
 
@@ -9,49 +8,49 @@ fun main() {
   val schema = FcSchema {
     /* -------------- fields -------------- */
     master("Simple") {
-      field("aText", FType.TEXT)
-      field("aInt", FType.INT)
-      field("aLong", FType.LONG)
-      field("aFloat", FType.FLOAT)
-      field("aDouble", FType.DOUBLE)
-      field("aBool", FType.BOOL)
-      field("aTime", FType.TIME)
-      field("aDate", FType.DATE)
-      field("aDateTime", FType.DATETIME)
-      field("aList", FType.LIST)
-      field("aMap", FType.MAP)
+      text("aText")
+      int("aInt")
+      long("aLong")
+      float("aFloat")
+      double("aDouble")
+      bool("aBool")
+      time("aTime")
+      date("aDate")
+      datetime("aDateTime")
+      list("aList")
+      map("aMap")
     }
 
     master("ComplexJSON") {
-      field("aList", FType.LIST)
-      field("aMap", FType.MAP)
+      list("aList")
+      map("aMap")
     }
 
     /* -------------- owned/linked refs -------------- */
     val Country = master("Country") {
-      field("name", FType.TEXT)
-      field("code", FType.TEXT)
+      text("name")
+      text("code")
     }
 
     master("User") {
-      field("name", FType.TEXT)
+      text("name")
       ownedRef("address", owned = detail("Address") {
-        field("city", FType.TEXT)
+        text("city")
         linkedRef("country", Country)
       })
     }
 
     /* -------------- owned/linked cols -------------- */
     val Permission = master("Permission") {
-      field("name", FType.TEXT)
-      field("url", FType.TEXT)
+      text("name")
+      text("url")
     }
 
     master("Role") {
-      field("name", FType.TEXT)
+      text("name")
       ownedCol("details", owned = detail("RoleDetail") {
-        field("name", FType.TEXT)
-        field("active", FType.BOOL)
+        text("name")
+        bool("active")
         linkedCol("perms", Permission)
       })
     }

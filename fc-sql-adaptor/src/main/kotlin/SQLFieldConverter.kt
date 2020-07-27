@@ -42,13 +42,13 @@ object SQLFieldConverter {
     .enableComplexMapKeySerialization()
     .create()
 
-  fun save(prop: SField, value: Any?): Any? = when (prop.type) {
+  fun save(prop: SField<*>, value: Any?): Any? = when (prop.type) {
     FType.LIST -> gson.toJson(value)
     FType.MAP -> gson.toJson(value)
     else -> value
   }
 
-  fun load(prop: SField, value: Any): Any = when (prop.type) {
+  fun load(prop: SField<*>, value: Any): Any = when (prop.type) {
     FType.LIST -> gson.fromJson(value.parse(), List::class.java)
     FType.MAP -> gson.fromJson(value.parse(), Map::class.java)
     else -> value

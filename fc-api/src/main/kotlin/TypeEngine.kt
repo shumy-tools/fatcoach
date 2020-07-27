@@ -52,7 +52,7 @@ object TypeEngine {
   }
 }
 
-fun SField.tryType(tryType: FType) {
+fun SField<*>.tryType(tryType: FType) {
   // list and map can contain any value
   if (type == FType.LIST || type == FType.MAP)
     return
@@ -64,5 +64,5 @@ fun SField.tryType(tryType: FType) {
   }
 
   if (implicitConvert != tryType)
-    throw Exception("Expecting typeOf ${type.name.toLowerCase()} for '${entity!!.name}.$name'. Trying to assign a ${tryType.name.toLowerCase()}.")
+    throw Exception("Expecting typeOf ${type.name.toLowerCase()} for '${entity.name}.$name'. Trying to assign a ${tryType.name.toLowerCase()}.")
 }

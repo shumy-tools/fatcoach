@@ -26,14 +26,14 @@ class FieldProxy {
 
   fun process(prop: SProperty): Any? {
     return when (prop) {
-      is SField -> processField(prop)
-      is SReference -> processRefID(prop, prop.isOptional)
+      is SField<*> -> processField(prop)
+      is SReference -> processRefID(prop, prop.optional)
       is SCollection -> {
         if (tValue.aParam != null) {
           val key = tValue.aParam.text.substring(1)
           _args.getRefIDList(key)
         } else
-          throw Exception("Expecting a collection or parameters for '${prop.entity!!.name}.${prop.name}'.")
+          throw Exception("Expecting a collection or parameters for '${prop.entity.name}.${prop.name}'.")
       }
     }
   }
@@ -41,15 +41,15 @@ class FieldProxy {
   fun processRefID(ref: SRelation, isOptional: Boolean): RefID {
     if (ref.type == RType.OWNED) {
       if (_isUpdate)
-        throw Exception("Updating an owned reference/collection is not supported. Update '${ref.entity!!.name}.${ref.name}' using the @parent field.")
+        throw Exception("Updating an owned reference/collection is not supported. Update '${ref.entity.name}.${ref.name}' using the @parent field.")
       else
-        throw Exception("Expecting an object for '${ref.entity!!.name}.${ref.name}'.")
+        throw Exception("Expecting an object for '${ref.entity.name}.${ref.name}'.")
     }
 
     return when {
       tValue.aNull != null -> {
         if (!isOptional)
-          throw Exception("Expecting an input value for a non-optional reference '${ref.entity!!.name}.${ref.name}'.")
+          throw Exception("Expecting an input value for a non-optional reference '${ref.entity.name}.${ref.name}'.")
         RefID()
       }
 
@@ -60,62 +60,70 @@ class FieldProxy {
         _args.getRefID(key)
       }
 
-      else -> throw Exception("Expecting typeOf (null, long, param=RefID) for '${ref.entity!!.name}.${ref.name}'.")
+      else -> throw Exception("Expecting typeOf (null, long, param=RefID) for '${ref.entity.name}.${ref.name}'.")
     }
   }
 
-  private fun processField(field: SField): Any? = when {
-    tValue.aNull != null -> {
-      if (!field.isOptional)
-        throw Exception("Expecting an input value for non-optional field '${field.entity!!.name}.${field.name}'.")
-      null
+  @Suppress("UNCHECKED_CAST")
+  private fun processField(field: SField<*>): Any? {
+    val value = when {
+      tValue.aNull != null -> {
+        if (!field.optional)
+          throw Exception("Expecting an input value for non-optional field '${field.entity.name}.${field.name}'.")
+        null
+      }
+
+      tValue.aText != null -> {
+        field.tryType(FType.TEXT)
+        tValue.aText.text.substring(1, tValue.aText.text.length-1)
+      }
+
+      tValue.aLong != null -> {
+        field.tryType(FType.LONG)
+        val value = tValue.aLong.text
+        if (field.type == FType.INT) value.toInt() else value.toLong()
+      }
+
+      tValue.aDouble != null -> {
+        field.tryType(FType.DOUBLE)
+        val value = tValue.aDouble.text
+        if (field.type == FType.FLOAT) value.toFloat() else value.toDouble()
+      }
+
+      tValue.aBool != null -> {
+        field.tryType(FType.BOOL)
+        tValue.aBool.text!!.toBoolean()
+      }
+
+      tValue.aTime != null -> {
+        field.tryType(FType.TIME)
+        LocalTime.parse(tValue.aTime.text.substring(1))
+      }
+
+      tValue.aDate != null -> {
+        field.tryType(FType.DATE)
+        LocalDate.parse(tValue.aDate.text.substring(1))
+      }
+
+      tValue.aDateTime != null -> {
+        field.tryType(FType.DATETIME)
+        LocalDateTime.parse(tValue.aDateTime.text.substring(1))
+      }
+
+      tValue.aParam != null -> {
+        val key = tValue.aParam.text.substring(1)
+        val value = _args[key] ?: throw Exception("Expecting an argument value for '${field.entity.name}.${field.name}'.")
+        field.tryType(TypeEngine.convert(value.javaClass.kotlin))
+        value
+      }
+
+      else -> throw Exception("Expecting typeOf (null, text, long, double, bool, time, data, datetime, param) for '${field.entity.name}.${field.name}'.")
     }
 
-    tValue.aText != null -> {
-      field.tryType(FType.TEXT)
-      tValue.aText.text.substring(1, tValue.aText.text.length-1)
-    }
+    // check SField constraints
+    (field as SField<Any>).check(value)
 
-    tValue.aLong != null -> {
-      field.tryType(FType.LONG)
-      val value = tValue.aLong.text
-      if (field.type == FType.INT) value.toInt() else value.toLong()
-    }
-
-    tValue.aDouble != null -> {
-      field.tryType(FType.DOUBLE)
-      val value = tValue.aDouble.text
-      if (field.type == FType.FLOAT) value.toFloat() else value.toDouble()
-    }
-
-    tValue.aBool != null -> {
-      field.tryType(FType.BOOL)
-      tValue.aBool.text!!.toBoolean()
-    }
-
-    tValue.aTime != null -> {
-      field.tryType(FType.TIME)
-      LocalTime.parse(tValue.aTime.text.substring(1))
-    }
-
-    tValue.aDate != null -> {
-      field.tryType(FType.DATE)
-      LocalDate.parse(tValue.aDate.text.substring(1))
-    }
-
-    tValue.aDateTime != null -> {
-      field.tryType(FType.DATETIME)
-      LocalDateTime.parse(tValue.aDateTime.text.substring(1))
-    }
-
-    tValue.aParam != null -> {
-      val key = tValue.aParam.text.substring(1)
-      val value = _args[key] ?: throw Exception("Expecting an argument value for '${field.entity!!.name}.${field.name}'.")
-      field.tryType(TypeEngine.convert(value.javaClass.kotlin))
-      value
-    }
-
-    else -> throw Exception("Expecting typeOf (null, text, long, double, bool, time, data, datetime, param) for '${field.entity!!.name}.${field.name}'.")
+    return value
   }
 }
 

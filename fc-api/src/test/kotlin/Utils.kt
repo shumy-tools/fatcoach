@@ -1,6 +1,5 @@
 package fc.test
 
-import fc.api.FType.*
 import fc.api.FcData
 import fc.api.FcSchema
 import fc.api.SEntity
@@ -17,51 +16,57 @@ open class TestAdaptor(override val schema: FcSchema) : IAdaptor {
 }
 
 fun createCorrectSchema() = FcSchema {
+  master("TextInvalid") {
+    text("aText") {
+      check = { it.endsWith("Text") }
+    }
+  }
+
   /* -------------- fields -------------- */
   master("Simple") {
-    field("aText", TEXT)
-    field("aInt", INT)
-    field("aLong", LONG)
-    field("aFloat", FLOAT)
-    field("aDouble", DOUBLE)
-    field("aBool", BOOL)
-    field("aTime", TIME)
-    field("aDate", DATE)
-    field("aDateTime", DATETIME)
-    field("aList", LIST)
-    field("aMap", MAP)
+    text("aText")
+    int("aInt")
+    long("aLong")
+    float("aFloat")
+    double("aDouble")
+    bool("aBool")
+    time("aTime")
+    date("aDate")
+    datetime("aDateTime")
+    list("aList")
+    map("aMap")
   }
 
   master("ComplexJSON") {
-    field("aList", LIST)
-    field("aMap", MAP)
+    list("aList")
+    map("aMap")
   }
 
   /* -------------- owned/linked refs -------------- */
   val Country = master("Country") {
-    field("name", TEXT)
-    field("code", TEXT)
+    text("name")
+    text("code")
   }
 
   master("User") {
-    field("name", TEXT)
+    text("name")
     ownedRef("address", owned = detail("Address") {
-      field("city", TEXT)
+      text("city")
       linkedRef("country", Country)
     })
   }
 
   /* -------------- owned/linked cols -------------- */
   val Permission = master("Permission") {
-    field("name", TEXT)
-    field("url", TEXT)
+    text("name")
+    text("url")
   }
 
   master("Role") {
-    field("name", TEXT)
+    text("name")
     ownedCol("details", owned = detail("RoleDetail") {
-      field("name", TEXT)
-      field("active", BOOL)
+      text("name")
+      bool("active")
       linkedCol("perms", Permission)
     })
   }

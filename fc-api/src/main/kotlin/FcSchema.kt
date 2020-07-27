@@ -1,44 +1,30 @@
 package fc.api
 
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+
 enum class EType { MASTER, DETAIL }
 enum class RType { OWNED, LINKED }
 
-class FcSchema(onChange: (FcSchema.() -> Unit)? = null) {
-  var committed = false
-    internal set
+class FcSchema(cfg: Builder.() -> Unit) {
+  class Builder(private val self: FcSchema) {
+    fun master(name: String, cfg: SEntity.Builder.() -> Unit) = self.addEntity(name, EType.MASTER, cfg)
+    fun detail(name: String, cfg: SEntity.Builder.() -> Unit) = self.addEntity(name, EType.DETAIL, cfg)
+  }
 
   val all: Map<String, SEntity> = linkedMapOf()
   val masters: Map<String, SEntity> = linkedMapOf()
   val details: Map<String, SEntity> = linkedMapOf()
 
-  init {
-    if (onChange != null) {
-      onChange()
-      commit()
-    }
-  }
+  init { cfg.invoke(Builder(this)) }
 
-  fun find(entity: String): SEntity {
-    return all[entity] ?: throw Exception("SEntity '$entity' not found!")
-  }
+  fun find(entity: String)= all[entity] ?: throw Exception("SEntity '$entity' not found!")
 
-  inline fun master(name: String, onChange: SEntity.() -> Unit): SEntity {
-    val newEntity = SEntity(name, EType.MASTER)
-    add(newEntity)
-    newEntity.onChange()
-    return newEntity
-  }
-
-  inline fun detail(name: String, onChange: SEntity.() -> Unit): SEntity {
-    val newEntity = SEntity(name, EType.DETAIL)
-    add(newEntity)
-    newEntity.onChange()
-    return newEntity
-  }
-
-  fun add(sEntity: SEntity) {
-    if (committed)
-      throw Exception("Cannot change a committed schema. Invoke 'change' and set the desired changes.")
+  private fun addEntity(name: String, type: EType, cfg: SEntity.Builder.() -> Unit): SEntity {
+    val sEntity = SEntity(name, type)
+    val builder = SEntity.Builder(sEntity)
+    cfg.invoke(builder)
 
     if (sEntity.schema != null)
       throw Exception("SEntity '${sEntity.name}' is already being used by a different FcSchema.")
@@ -53,39 +39,42 @@ class FcSchema(onChange: (FcSchema.() -> Unit)? = null) {
       EType.MASTER -> (masters as LinkedHashMap<String, SEntity>)[sEntity.name] = sEntity
       EType.DETAIL -> (details as LinkedHashMap<String, SEntity>)[sEntity.name] = sEntity
     }
+
+    return sEntity
   }
-
-  fun del(name: String) {
-    if (committed)
-      throw Exception("Cannot change a committed schema. Invoke 'change' and set the desired changes.")
-
-    (masters as LinkedHashMap<String, SEntity>).remove(name)
-    (details as LinkedHashMap<String, SEntity>).remove(name)
-
-    val sEntity = (all as LinkedHashMap<String, SEntity>).remove(name)
-    sEntity?.schema = null
-  }
-
-  // deep clone the schema and return
-  fun change(): FcSchema {
-    val newSchema = FcSchema()
-    all.values.forEach { newSchema.add(it.clone()) }
-    return newSchema
-  }
-
-  fun commit() { committed = true }
 }
 
-class SEntity(val name: String, val type: EType) {
+class SEntity internal constructor(val name: String, val type: EType) {
+  class Builder(private val self: SEntity) {
+    fun text(prop: String, cfg: (SField.Builder<String>.() -> Unit)? = null) = self.addField(prop, FType.TEXT, cfg)
+    fun int(prop: String, cfg: (SField.Builder<Int>.() -> Unit)? = null) = self.addField(prop, FType.INT, cfg)
+    fun long(prop: String, cfg: (SField.Builder<Long>.() -> Unit)? = null) = self.addField(prop, FType.LONG, cfg)
+    fun float(prop: String, cfg: (SField.Builder<Float>.() -> Unit)? = null) = self.addField(prop, FType.FLOAT, cfg)
+    fun double(prop: String, cfg: (SField.Builder<Double>.() -> Unit)? = null) = self.addField(prop, FType.DOUBLE, cfg)
+    fun bool(prop: String, cfg: (SField.Builder<Boolean>.() -> Unit)? = null) = self.addField(prop, FType.BOOL, cfg)
+
+    fun time(prop: String, cfg: (SField.Builder<LocalTime>.() -> Unit)? = null) = self.addField(prop, FType.TIME, cfg)
+    fun date(prop: String, cfg: (SField.Builder<LocalDate>.() -> Unit)? = null) = self.addField(prop, FType.DATE, cfg)
+    fun datetime(prop: String, cfg: (SField.Builder<LocalDateTime>.() -> Unit)? = null) = self.addField(prop, FType.DATETIME, cfg)
+
+    fun list(prop: String, cfg: (SField.Builder<List<Any>>.() -> Unit)? = null) = self.addField(prop, FType.LIST, cfg)
+    fun map(prop: String, cfg: (SField.Builder<Map<String, Any>>.() -> Unit)? = null) = self.addField(prop, FType.MAP, cfg)
+
+    fun linkedRef(prop: String, ref: SEntity, cfg: (SReference.Builder.() -> Unit)? = null) = self.addRef(prop, RType.LINKED, ref, cfg)
+    fun ownedRef(prop: String, owned: SEntity, cfg: (SReference.Builder.() -> Unit)? = null) = self.addRef(prop, RType.OWNED, owned, cfg)
+
+    fun linkedCol(prop: String, ref: SEntity, cfg: (SCollection.Builder.() -> Unit)? = null) = self.addCol(prop, RType.LINKED, ref, cfg)
+    fun ownedCol(prop: String, owned: SEntity, cfg: (SCollection.Builder.() -> Unit)? = null) = self.addCol(prop, RType.OWNED, owned, cfg)
+  }
+
   internal var schema: FcSchema? = null
   internal var parent: SReference? = null
 
-  val id: SField = SField(SID, FType.LONG, isInput = false, isOptional = false, isUnique = true)
   val all: Map<String, SProperty> = linkedMapOf()
-  val fields: Map<String, SField> = linkedMapOf()
+  val fields: Map<String, SField<*>> = linkedMapOf()
   val rels: Map<String, SRelation> = linkedMapOf()
 
-  init { id.iEntity = this }
+  val id = SField(this, SID, FType.LONG, SField.Builder<Long>().also { it.input = false; it.unique = true })
 
   val refs: List<SReference>
     get() = rels.values.filterIsInstance<SReference>()
@@ -93,91 +82,56 @@ class SEntity(val name: String, val type: EType) {
   val cols: List<SCollection>
     get() = rels.values.filterIsInstance<SCollection>()
 
-  /* ------------------------- owned/linked -------------------------*/
-  /*val ownedRefs: List<SReference>
-    get() = rels.values.filterIsInstance<SReference>().filter { it.type == RType.OWNED }
 
-  val linkedRefs: List<SReference>
-    get() = rels.values.filterIsInstance<SReference>().filter { it.type == RType.LINKED }
+  private fun <T> addField(prop: String, type: FType, cfg: (SField.Builder<T>.() -> Unit)?): SField<T> {
+    val builder = SField.Builder<T>()
+    cfg?.invoke(builder)
 
-  val ownedCols: List<SCollection>
-    get() = rels.values.filterIsInstance<SCollection>().filter { it.type == RType.OWNED }
-
-  val linkedCols: List<SCollection>
-    get() = rels.values.filterIsInstance<SCollection>().filter { it.type == RType.LINKED }
-  */
-
-  private fun checkChange() {
-    if (schema == null)
-      throw Exception("Cannot change an orphan entity. Add the entity to a FcSchema.")
-
-    if (schema!!.committed)
-      throw Exception("Cannot change a committed schema. Invoke 'change' and set the desired changes.")
+    val sField = SField(this, prop, type, builder)
+    addProperty(sField)
+    return sField
   }
 
-  fun field(name: String, type: FType, isOptional: Boolean = false, isInput: Boolean = true, isUnique: Boolean = false) {
-    val newProperty = SField(name, type, isOptional, isInput, isUnique)
-    add(newProperty)
+  private fun addRef(prop: String, type: RType, ref: SEntity, cfg: (SReference.Builder.() -> Unit)?): SReference {
+    val builder = SReference.Builder()
+    cfg?.invoke(builder)
+
+    val sRef = SReference(this, prop, type, ref, builder)
+    addProperty(sRef)
+    return sRef
   }
 
-  fun linkedRef(name: String, ref: SEntity, isOptional: Boolean = false, isInput: Boolean = true) {
-    val newProperty = SReference(name, RType.LINKED, ref, isOptional, isInput)
-    add(newProperty)
+  private fun addCol(prop: String, type: RType, ref: SEntity, cfg: (SCollection.Builder.() -> Unit)?): SCollection {
+    val builder = SCollection.Builder()
+    cfg?.invoke(builder)
+
+    val sCol = SCollection(this, prop, type, ref, builder)
+    addProperty(sCol)
+    return sCol
   }
 
-  fun ownedRef(name: String, isOptional: Boolean = false, isInput: Boolean = true, owned: SEntity) {
-    val newProperty = SReference(name, RType.OWNED, owned, isOptional, isInput)
-    add(newProperty)
-  }
-
-  fun linkedCol(name: String, ref: SEntity, isInput: Boolean = true) {
-    val newProperty = SCollection(name, RType.LINKED, ref, isInput)
-    add(newProperty)
-  }
-
-  fun ownedCol(name: String, isInput: Boolean = true, owned: SEntity) {
-    val newProperty = SCollection(name, RType.OWNED, owned, isInput)
-    add(newProperty)
-  }
-
-  fun add(sProperty: SProperty) {
-    checkChange()
-
-    if (sProperty.iEntity != null)
-      throw Exception("SProperty '${sProperty.name}' is already being used by a different SEntity '${sProperty.entity!!.name}'.")
-
+  private fun addProperty(sProperty: SProperty) {
     if (all.containsKey(sProperty.name))
       throw Exception("SProperty '${sProperty.name}' already exists in the SEntity '$name'.")
 
-    sProperty.iEntity = this
     (all as LinkedHashMap<String, SProperty>)[sProperty.name] = sProperty
-
     when (sProperty) {
-      is SField -> (fields as LinkedHashMap<String, SField>)[sProperty.name] = sProperty
+      is SField<*> -> (fields as LinkedHashMap<String, SField<*>>)[sProperty.name] = sProperty
 
-      is SReference -> {
-        own(sProperty) // set the @parent property for owned entities
-        (rels as LinkedHashMap<String, SRelation>)[sProperty.name] = sProperty
-      }
+      is SRelation -> {
+        // set the @parent property for owned entities
+        if (sProperty.type == RType.OWNED) {
+          if (sProperty.ref.type != EType.DETAIL)
+            throw Exception("Only entities of type DETAIL can be owned. '${name}:${sProperty.name}' trying to own '${sProperty.ref.name}'.")
 
-      is SCollection -> {
-        own(sProperty) // set the @parent property for owned entities
+          if (sProperty.ref.parent != null)
+            throw Exception("SEntity '${sProperty.ref.name}' already owned by '$name'.")
+
+          sProperty.ref.parent = sProperty.ref.addRef(SPARENT, RType.LINKED, this, null)
+        }
         (rels as LinkedHashMap<String, SRelation>)[sProperty.name] = sProperty
       }
     }
-  }
-
-  fun del(name: String) {
-    checkChange()
-
-    if (name == SPARENT)
-      throw Exception("Cannot remove '$SPARENT' from a SEntity.")
-
-    (fields as LinkedHashMap<String, SField>).remove(name)
-    (rels as LinkedHashMap<String, SRelation>).remove(name)
-
-    val sProperty = (all as LinkedHashMap<String, SProperty>).remove(name)
-    sProperty?.iEntity = null
   }
 
   override fun toString() = """SEntity(${name}):
@@ -185,81 +139,56 @@ class SEntity(val name: String, val type: EType) {
   """.trimMargin()
 }
 
-sealed class SProperty(val name: String, val isInput: Boolean) {
-  internal var iEntity: SEntity? = null
 
-  val entity: SEntity
-    get() = iEntity!!
-
+sealed class SProperty(val entity: SEntity, val name: String, val input: Boolean) {
   abstract fun simpleString(): String
 }
 
-  class SField(
-    name: String,
-    val type: FType,
-    val isOptional: Boolean,
-    isInput: Boolean,
-    val isUnique: Boolean
-  ): SProperty(name, isInput) {
+  class SField<T> internal constructor(entity: SEntity, name: String, val type: FType, private val builder: Builder<T>): SProperty(entity, name, builder.input) {
+    class Builder<T> {
+      var input = true
+      var optional = false
+      var unique = false
+
+      var check: ((T) -> Boolean)? = null
+    }
+
+    val optional: Boolean
+      get() = builder.optional
+
+    val unique: Boolean
+      get() = builder.unique
+
+    fun check(value: T?) = value?.let {
+      val result = builder.check?.invoke(it)
+      if (result == false)
+        throw Exception("Check constraint failed for ${entity.name}::${simpleString()}")
+    }
+
     override fun simpleString() = "(${type.name.toLowerCase()}@$name)"
-    override fun toString() = "SField(${entity!!.name}::${simpleString()}, optional=$isOptional, input=$isInput, unique=$isUnique)"
+    override fun toString() = "SField(${entity.name}::${simpleString()}, optional=$optional, input=$input, unique=$unique)"
   }
 
-  sealed class SRelation(
-    name: String,
-    val type: RType,
-    val ref: SEntity,
-    isInput: Boolean
-  ): SProperty(name, isInput) {
+  sealed class SRelation(entity: SEntity, name: String, val type: RType, val ref: SEntity, input: Boolean): SProperty(entity, name, input) {
     override fun simpleString() = "(${ref.name}@$name)"
   }
 
-    class SReference(
-      name: String,
-      type: RType,
-      ref: SEntity,
-      val isOptional: Boolean,
-      isInput: Boolean
-    ): SRelation(name, type, ref, isInput) {
-      override fun toString() = "SReference(${entity!!.name}::${simpleString()}, type=${type.name.toLowerCase()}, optional=$isOptional, input=$isInput)"
-    }
-
-    class SCollection(
-      name: String,
-      type: RType,
-      ref: SEntity,
-      isInput: Boolean
-    ): SRelation(name, type, ref, isInput) {
-      override fun toString() = "SCollection(${entity!!.name}::${simpleString()}, type=${type.name.toLowerCase()}, input=$isInput)"
-    }
-
-/* ------------------------- helpers -------------------------*/
-fun SEntity.own(sProperty: SRelation) {
-  if (sProperty.type == RType.OWNED) {
-    if (sProperty.ref.type != EType.DETAIL)
-      throw Exception("Only entities of type DETAIL can be owned. '${name}:${sProperty.name}' trying to own '${sProperty.ref.name}'.")
-
-    if (sProperty.ref.parent != null)
-      throw Exception("SEntity '${sProperty.ref.name}' already owned by '$name'.")
-
-    val parentRef = SReference(SPARENT, RType.LINKED, ref = this, isOptional = false, isInput = true)
-    sProperty.ref.parent = parentRef
-    sProperty.ref.add(parentRef)
-  }
-}
-
-fun SEntity.clone(): SEntity = SEntity(name, type).also {
-  for (prop in all.values) {
-    when (prop) {
-      is SField -> it.add(prop)
-      is SRelation -> {
-        // clone only entities from the original schema
-        val ref = if (prop.ref.schema != null) prop.ref.clone() else prop.ref
-        when (prop) {
-          is SReference -> it.add(SReference(prop.name, prop.type, ref, prop.isOptional, prop.isInput))
-          is SCollection -> it.add(SCollection(prop.name, prop.type, ref, prop.isInput))
-        }
+    class SReference internal constructor(entity: SEntity, name: String, type: RType, ref: SEntity, private val builder: Builder): SRelation(entity, name, type, ref, builder.input) {
+      class Builder {
+        var input = true
+        var optional = false
       }
+
+      val optional: Boolean
+        get() = builder.optional
+
+      override fun toString() = "SReference(${entity.name}::${simpleString()}, type=${type.name.toLowerCase()}, optional=$optional, input=$input)"
     }
-  }
-}
+
+    class SCollection internal constructor(entity: SEntity, name: String, type: RType, ref: SEntity, private val builder: Builder): SRelation(entity, name, type, ref, builder.input) {
+      class Builder {
+        var input = true
+      }
+
+      override fun toString() = "SCollection(${entity.name}::${simpleString()}, type=${type.name.toLowerCase()}, input=$input)"
+    }

@@ -8,8 +8,9 @@ import fc.api.input.*
 import fc.api.spi.IAuthorizer
 import org.junit.Test
 import kotlin.concurrent.getOrSet
+import kotlin.test.assertFails
 
-private fun Set<SProperty>.text() = map{"${it.entity!!.name}::${it.simpleString()}"}.toString()
+private fun Set<SProperty>.text() = map{"${it.entity.name}::${it.simpleString()}"}.toString()
 
 private fun FcInstruction.type() = when (this) {
   is FcCreate -> "CREATE"
@@ -327,6 +328,16 @@ class TestInput {
       check("FcCreate(RoleDetail) @id=$role1AddDet - {@parent=(RefID@$roleID1), name=(String@role-det-5), active=(Boolean@true), perms=[(RefID@$permID1), (RefID@$permID4)]}")
       check("FcUpdate(RoleDetail) @id=$role1AddDet - {perms=[(RefLink@(@add -> $permID2)), (RefLink@(@add -> $permID3))]}")
       check("FcUpdate(RoleDetail) @id=$role1AddDet - {perms=[(RefLink@(@del -> $permID2)), (RefLink@(@del -> $permID3))]}")
+    }
+  }
+
+  @Test fun testInvalidInputField() {
+    db.tx {
+      assertFails("Check constraint failed for TextInvalid::(text@aText)") {
+        create("""TextInvalid {
+          aText: "newNo"
+        }""")
+      }
     }
   }
 }

@@ -64,7 +64,7 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
       val sProperty = self.all[prop] ?: throw Exception("Property '$prop' not found in entity '${self.name}.")
 
       // parse input properties
-      val value = if (sProperty.isInput) {
+      val value = if (sProperty.input) {
         fcCreate.accessed.add(sProperty)
         when {
           it.value() != null -> FieldProxy(it.value(), args, false).process(sProperty)
@@ -72,7 +72,7 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
           it.data() != null -> {
             val obj = it.data()
             when (sProperty) {
-              is SField -> { sProperty.tryType(FType.MAP); MapProxy(obj).parse() }
+              is SField<*> -> { sProperty.tryType(FType.MAP); MapProxy(obj).parse() }
               is SReference -> {
                 if (sProperty.type == RType.LINKED)
                   throw Exception("Expecting typeOf (null, long, param) for '${self.name}.$prop'.")
@@ -90,7 +90,7 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
 
     // check if all input properties are present
     val completed = if (parentStack.isNotEmpty()) inputs.plus(self.parent!!.name to parentStack.peek().root) else inputs
-    self.all.values.filter { it.isInput }.forEach {
+    self.all.values.filter { it.input }.forEach {
       if (!completed.containsKey(it.name))
         throw Exception("Expecting an input value for '${self.name}:${it.name}'.")
     }
@@ -101,7 +101,7 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
 
   private fun ListContext.processList(prop: SProperty): List<Any> {
     return when (prop) {
-      is SField -> {
+      is SField<*> -> {
         when (prop.type) {
           FType.LIST -> ListProxy(this).parse()
           FType.MAP -> throw Exception("Expecting an object for '${prop.entity.name}.${prop.name}'.")

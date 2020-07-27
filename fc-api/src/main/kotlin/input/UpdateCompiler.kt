@@ -50,7 +50,7 @@ internal class UpdateCompiler(private val dsl: String, private val schema: FcSch
       val sProperty = self.all[prop] ?: throw Exception("Property '$prop' not found in entity '${self.name}.")
 
       // parse input properties
-      val value = if (sProperty.isInput) {
+      val value = if (sProperty.input) {
         fcUpdate.accessed.add(sProperty)
         when {
           it.value() != null -> FieldProxy(it.value(), args, true).process(sProperty)
@@ -59,7 +59,7 @@ internal class UpdateCompiler(private val dsl: String, private val schema: FcSch
           it.data() != null -> {
             val obj = it.data()
             when (sProperty) {
-              is SField -> { sProperty.tryType(FType.MAP); MapProxy(obj).parse() }
+              is SField<*> -> { sProperty.tryType(FType.MAP); MapProxy(obj).parse() }
               is SReference -> throw Exception("Expecting typeOf (null, long, param) for '${self.name}.$prop'.")
               is SCollection -> throw Exception("Expecting a collection for '${self.name}.$prop'.")
             }
@@ -77,7 +77,7 @@ internal class UpdateCompiler(private val dsl: String, private val schema: FcSch
 
   private fun OperContext.processOperation(sProperty: SProperty): Any {
     val prop = sProperty.name
-    val sEntity = sProperty.entity!!
+    val sEntity = sProperty.entity
     if (sProperty !is SRelation)
       throw Exception("Unexpected operation (@add, @del) for field '${sEntity.name}.$prop'.")
 
@@ -104,20 +104,20 @@ internal class UpdateCompiler(private val dsl: String, private val schema: FcSch
 
   private fun ListContext.processList(prop: SProperty): List<Any?> {
     return when (prop) {
-      is SField -> {
+      is SField<*> -> {
         when (prop.type) {
           FType.LIST -> ListProxy(this).parse()
-          FType.MAP -> throw Exception("Expecting an object for '${prop.entity!!.name}.${prop.name}'.")
-          else -> throw Exception("A list is not compatible with the type '${prop.type.name.toLowerCase()}' for '${prop.entity!!.name}.${prop.name}'.")
+          FType.MAP -> throw Exception("Expecting an object for '${prop.entity.name}.${prop.name}'.")
+          else -> throw Exception("A list is not compatible with the type '${prop.type.name.toLowerCase()}' for '${prop.entity.name}.${prop.name}'.")
         }
       }
 
       is SCollection -> when (prop.type) {
-        RType.OWNED -> throw Exception("Updating an owned reference/collection is not supported. Update '${prop.entity!!.name}.${prop.name}' using the @parent field.")
+        RType.OWNED -> throw Exception("Updating an owned reference/collection is not supported. Update '${prop.entity.name}.${prop.name}' using the @parent field.")
         RType.LINKED -> item().map { FieldProxy(it.value(), args, false).processRefID(prop, false) }
       }
 
-      is SReference -> throw Exception("Expecting a reference for '${prop.entity!!.name}.${prop.name}'.")
+      is SReference -> throw Exception("Expecting a reference for '${prop.entity.name}.${prop.name}'.")
     }
   }
 }
