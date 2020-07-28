@@ -16,9 +16,31 @@ open class TestAdaptor(override val schema: FcSchema) : IAdaptor {
 }
 
 fun createCorrectSchema() = FcSchema {
-  master("TextInvalid") {
-    text("aText") {
-      check = { it.endsWith("Text") }
+  master("TestConstraints") {
+    val aIntField = int("aInt")
+    val aTextField = text("aText") {
+      checkIf { it.endsWith("Text") }
+    }
+
+    text("aDerived") {
+      deriveFrom { "aDerivedValue" }
+    }
+
+    text("aNonOptional") { input = false }
+
+    onCreate {
+      val aInt = it.get(aIntField)
+      val aText = it.get(aTextField)
+      val aDerived = it.values["aDerived"] as String
+      if (aInt == 10 && aText == "newText" && aDerived == "aDerivedValue")
+        throw Exception("Testing onCreate")
+    }
+
+    onUpdate {
+      val id = it.selfID.id
+      val aText = it.values["aText"] as String
+      if (id == 1L && aText == "u-newText")
+        throw Exception("Testing onUpdate")
     }
   }
 
@@ -50,10 +72,13 @@ fun createCorrectSchema() = FcSchema {
 
   master("User") {
     text("name")
-    ownedRef("address", owned = detail("Address") {
+
+    val Address = detail("Address") {
       text("city")
       linkedRef("country", Country)
-    })
+    }
+
+    ownedRef("address", Address)
   }
 
   /* -------------- owned/linked cols -------------- */

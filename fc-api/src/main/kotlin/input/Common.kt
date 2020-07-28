@@ -64,7 +64,6 @@ class FieldProxy {
     }
   }
 
-  @Suppress("UNCHECKED_CAST")
   private fun processField(field: SField<*>): Any? {
     val value = when {
       tValue.aNull != null -> {
@@ -119,9 +118,6 @@ class FieldProxy {
 
       else -> throw Exception("Expecting typeOf (null, text, long, double, bool, time, data, datetime, param) for '${field.entity.name}.${field.name}'.")
     }
-
-    // check SField constraints
-    (field as SField<Any>).check(value)
 
     return value
   }

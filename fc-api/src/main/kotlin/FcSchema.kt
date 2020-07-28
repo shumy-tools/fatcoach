@@ -46,6 +46,9 @@ class FcSchema(cfg: Builder.() -> Unit) {
 
 class SEntity internal constructor(val name: String, val type: EType) {
   class Builder(private val self: SEntity) {
+    fun onCreate(callback: (ctx: TxContext) -> Unit) { self.onCreate = callback }
+    fun onUpdate(callback: (ctx: TxContext) -> Unit) { self.onUpdate = callback }
+
     fun text(prop: String, cfg: (SField.Builder<String>.() -> Unit)? = null) = self.addField(prop, FType.TEXT, cfg)
     fun int(prop: String, cfg: (SField.Builder<Int>.() -> Unit)? = null) = self.addField(prop, FType.INT, cfg)
     fun long(prop: String, cfg: (SField.Builder<Long>.() -> Unit)? = null) = self.addField(prop, FType.LONG, cfg)
@@ -70,6 +73,9 @@ class SEntity internal constructor(val name: String, val type: EType) {
   internal var schema: FcSchema? = null
   internal var parent: SReference? = null
 
+  internal var onCreate: ((ctx: TxContext) -> Unit)? = null
+  internal var onUpdate: ((ctx: TxContext) -> Unit)? = null
+
   val all: Map<String, SProperty> = linkedMapOf()
   val fields: Map<String, SField<*>> = linkedMapOf()
   val rels: Map<String, SRelation> = linkedMapOf()
@@ -82,6 +88,8 @@ class SEntity internal constructor(val name: String, val type: EType) {
   val cols: List<SCollection>
     get() = rels.values.filterIsInstance<SCollection>()
 
+  internal fun onCreate(ctx: TxContext) = onCreate?.invoke(ctx)
+  internal fun onUpdate(ctx: TxContext) = onUpdate?.invoke(ctx)
 
   private fun <T> addField(prop: String, type: FType, cfg: (SField.Builder<T>.() -> Unit)?): SField<T> {
     val builder = SField.Builder<T>()
@@ -150,7 +158,16 @@ sealed class SProperty(val entity: SEntity, val name: String, val input: Boolean
       var optional = false
       var unique = false
 
-      var check: ((T) -> Boolean)? = null
+      internal val checks = mutableListOf<ICheck<T>>()
+      fun checkIf(onCheck: (T) -> Boolean) = checks.add(SimpleCheck(onCheck))
+      fun checkIf(message: String, onCheck: (T) -> Boolean) = checks.add(SimpleCheck(onCheck, message))
+      fun checkIf(onCheck: ICheck<T>) = checks.add(onCheck)
+
+      internal var derived: (() -> T)? = null
+      fun deriveFrom(onDerive: () -> T) {
+        input = false
+        derived = onDerive
+      }
     }
 
     val optional: Boolean
@@ -159,11 +176,18 @@ sealed class SProperty(val entity: SEntity, val name: String, val input: Boolean
     val unique: Boolean
       get() = builder.unique
 
-    fun check(value: T?) = value?.let {
-      val result = builder.check?.invoke(it)
-      if (result == false)
-        throw Exception("Check constraint failed for ${entity.name}::${simpleString()}")
+    internal fun check(value: T?) = value?.let { cValue ->
+      builder.checks.forEach {
+        if (!it.check(cValue)) {
+          if (it.message != null)
+            throw Exception(it.message)
+          else
+            throw Exception("Check constraint failed for '${entity.name}::$name'.")
+        }
+      }
     }
+
+    internal fun derive() = builder.derived?.invoke()
 
     override fun simpleString() = "(${type.name.toLowerCase()}@$name)"
     override fun toString() = "SField(${entity.name}::${simpleString()}, optional=$optional, input=$input, unique=$unique)"
@@ -192,3 +216,18 @@ sealed class SProperty(val entity: SEntity, val name: String, val input: Boolean
 
       override fun toString() = "SCollection(${entity.name}::${simpleString()}, type=${type.name.toLowerCase()}, input=$input)"
     }
+
+interface ICheck<T> {
+  val message: String?
+  fun check(value: T): Boolean
+}
+
+class TxContext(val tx: FcTxData, val selfID: RefID, val values: MutableMap<String, Any?>) {
+  fun <T> get(field: SField<T>) = values[field.name]
+  fun <T> set(field: SField<T>, value: T) { values[field.name] = value }
+}
+
+/* ------------------------- helpers -------------------------*/
+private class SimpleCheck<T>(private val checkFun: (T) -> Boolean, override val message: String? = null): ICheck<T> {
+  override fun check(value: T) = checkFun.invoke(value)
+}

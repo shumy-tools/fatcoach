@@ -83,7 +83,7 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
           }
           else -> throw Exception("Bug - CreateCompiler.processData() - 1. Unrecognized dsl branch!")
         }
-      } else throw Exception("Bug - CreateCompiler.processData() - 2. Unrecognized dsl branch!")
+      } else throw Exception("Unexpected value for '${self.name}:${sProperty.name}', property is not an input!")
 
       sProperty.name to value
     }?.toMap() ?: emptyMap()
@@ -95,8 +95,33 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
         throw Exception("Expecting an input value for '${self.name}:${it.name}'.")
     }
 
-    // TODO: process derive fields ?
-    fcCreate.values = completed
+    // set derived fields
+    val derived = self.fields.values.filter { !it.input }.map {
+      it.name to it.derive()
+    }.toMap()
+
+    val allInputValues = completed.plus(derived).toMutableMap()
+    fcCreate.values = allInputValues
+    self.onCreate(TxContext(tx.txData, selfTree.root, allInputValues))
+
+    // check field constraints
+    @Suppress("UNCHECKED_CAST")
+    self.fields.values.forEach {
+      val value = fcCreate.values[it.name]
+      (it as SField<Any>).check(value)
+    }
+
+    // check non-optional fields
+    self.fields.values.filter { !it.optional }.forEach {
+      if (fcCreate.values[it.name] == null)
+        throw Exception("Expecting a value for '${self.name}:${it.name}'.")
+    }
+
+    // check non-optional references
+    self.refs.filter { !it.optional }.forEach {
+      if (fcCreate.values[it.name] == null)
+        throw Exception("Expecting a value for '${self.name}:${it.name}'.")
+    }
   }
 
   private fun ListContext.processList(prop: SProperty): List<Any> {

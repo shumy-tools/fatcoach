@@ -66,13 +66,21 @@ internal class UpdateCompiler(private val dsl: String, private val schema: FcSch
           }
           else -> throw Exception("Bug - UpdateCompiler.processData() - 1. Unrecognized dsl branch!")
         }
-      } else throw Exception("Bug - UpdateCompiler.processData() - 2. Unrecognized dsl branch!")
+      }  else throw Exception("Unexpected value for '${self.name}:${sProperty.name}', property is not an input!")
 
       sProperty.name to value
     }?.toMap() ?: emptyMap()
 
-    // TODO: process derive fields ?
+    val allInputValues = inputs.toMutableMap()
     fcUpdate.values = inputs
+    self.onUpdate(TxContext(tx.txData, selfID, allInputValues))
+
+    // check field constraints
+    @Suppress("UNCHECKED_CAST")
+    self.fields.values.forEach {
+      val value = fcUpdate.values[it.name]
+      (it as SField<Any>).check(value)
+    }
   }
 
   private fun OperContext.processOperation(sProperty: SProperty): Any {

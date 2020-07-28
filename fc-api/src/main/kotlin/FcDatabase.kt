@@ -10,7 +10,7 @@ class FcDatabase(private val adaptor: IAdaptor, private val authorizer: IAuthori
     get() = adaptor.schema
 
   fun tx(transaction: FcTxData.() -> Unit): Transaction {
-    val txData = FcTxData(schema)
+    val txData = FcTxData(this, schema)
     transaction(txData)
 
     // check security constraints

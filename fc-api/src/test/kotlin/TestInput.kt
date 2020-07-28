@@ -9,6 +9,7 @@ import fc.api.spi.IAuthorizer
 import org.junit.Test
 import kotlin.concurrent.getOrSet
 import kotlin.test.assertFails
+import kotlin.test.assertFailsWith
 
 private fun Set<SProperty>.text() = map{"${it.entity.name}::${it.simpleString()}"}.toString()
 
@@ -331,13 +332,54 @@ class TestInput {
     }
   }
 
-  @Test fun testInvalidInputField() {
+  @Test fun testConstraintChecks() {
     db.tx {
-      assertFails("Check constraint failed for TextInvalid::(text@aText)") {
-        create("""TextInvalid {
+      val error1 = assertFails {
+        create("""TestConstraints {
+          aInt: 10
+        }""")
+      }
+      assert(error1.message == "Expecting an input value for 'TestConstraints:aText'.")
+
+      val error2 = assertFails {
+        create("""TestConstraints {
+          aInt: 12,
+          aText: "newText"
+        }""")
+      }
+      assert(error2.message == "Expecting a value for 'TestConstraints:aNonOptional'.")
+
+      val error3 = assertFails {
+        create("""TestConstraints {
+          aInt: 10,
+          aText: "newText",
+          aNonOptional: "value"
+        }""")
+      }
+      assert(error3.message == "Unexpected value for 'TestConstraints:aNonOptional', property is not an input!")
+
+      val error4 = assertFails {
+        create("""TestConstraints {
+          aInt: 10,
           aText: "newNo"
         }""")
       }
+      assert(error4.message == "Check constraint failed for 'TestConstraints::aText'.")
+
+      val error5 = assertFails {
+        create("""TestConstraints {
+          aInt: 10,
+          aText: "newText"
+        }""")
+      }
+      assert(error5.message == "Testing onCreate")
+
+      val error6 = assertFails {
+        update("""TestConstraints @id == 1 {
+          aText: "u-newText"
+        }""")
+      }
+      assert(error6.message == "Testing onUpdate")
     }
   }
 }
