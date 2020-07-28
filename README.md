@@ -14,7 +14,14 @@ Lets assume the following data model in UML:
 
 ![An Example schema](./docs/Test.png)
 
-Entities are categorized as Master or Detail. The underlying logic for the master/detail structure is that it works as a unit. A detail entity cannot exist without a master and only has one master. A master always owns a detail entity via an owned relation. When such a master/detail connection exists, this generally means that both entities are created in the same business process.
+* Entities are categorized as Master or Detail. The underlying logic for the master/detail structure is that it works as a unit. A detail entity must be owned by one and only one entity. A master has no owners, it's a top entity. When such a master/detail connection exists, this generally means that both entities are created in the same business process. The top master entity and the corresponding owned tree structure is designated as an island structure. 
+
+* @id and @parent are reserved property names. @id is automatically provided by the framework to uniquely identity entries. @parent is the master's reference provided in detail entities.
+
+* Other properties are categorized as fields and relations. Relations are references and collections, and are categorized as owned or linked. An entity always owns another detail entity via an owned relation, forming structured islands. Links are normally used to connect different islands.     
+
+Given the example, existing structured islands are: (```User```, ```Address```), (```Role```, ```Permission```) and (```Country```). Island connections, or linked relations are: ```User::roles``` and ```Address::country```.
+This modeling scheme is very useful to isolate and identify different parts of the model that are normally associated to different purposes. It also easily identifies master/details structures that are normally related with UI design patterns, alleviating the model mismatch between the DB and UI.
 
 The schema is defined in Koltin via:
 ```kotlin
@@ -54,11 +61,16 @@ val schema = FcSchema {
 ```
 
 ### Input DSL
-* Creating a Country entry and returning @id = 1.
+* Creating two ```Country``` entries and returning the ids, @id = [1, 2].
 ```
 Country {
   name: "Spain",
   code: "ES"
+}
+
+Country {
+  name: "Portugal",
+  code: "PT"
 }
 ```
 
@@ -81,7 +93,7 @@ Role {
 }
 ```
 
-* Creating a ```User``` entry with an owned ```address``` referencing the ```Country``` entry, and a list of ```roles``` references. Returning @id = 1.
+* Creating a ```User``` entry with an owned ```address``` referencing the ```Country``` entry, and a list of ```Role``` references. Returning @id = 1.
 ```
 User {
   name: "Alex",
@@ -103,7 +115,17 @@ User @id == 1 {
 }
 ```
 
-### Query SQL
+* Adding another ```Address``` detail to the ```User``` via create, using the @parent reference.
+```
+Address {
+  @parent: 1,
+  city: "Aveiro",
+  local: "Another place to live!",
+  country: 2
+}
+```
+
+### Query DSL
 A query returns a sub-tree snapshot of the database graph. 
 
 * Queering ```User``` entries filtered by ```User::name``` and ```User::address.country.name```. Returns a JSON structure for the selected fields, including the inner fields for the Address reference. The ```*``` symbol is the selector for all fields. 
@@ -117,12 +139,12 @@ User | name == "Alex" and address.country.name == "Spain" | {
 }
 ```
 
-* Page and limit can be applied.
+* Page and limit can be applied after the filter (if exists).
 ```
 User limit 2 page 1 { * }
 ```
 
-* Order can be applied to each field.
+* Sorting can be applied to each field.
 ```
 User {
   (asc 1) name,
@@ -137,3 +159,14 @@ User {
   roles | name == "admin" | { * }
 }
 ```
+
+* Query parameters can be used in multiple places.
+```
+User | name == ?name and address.city == "Aveiro" | limit ?limit {
+  name,
+  roles { * }
+}
+```
+
+### Using the Client
+TODO

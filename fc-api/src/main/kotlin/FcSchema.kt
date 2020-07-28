@@ -119,6 +119,9 @@ class SEntity internal constructor(val name: String, val type: EType) {
   }
 
   private fun addProperty(sProperty: SProperty) {
+    if (sProperty.name == SID || sProperty.name == SPARENT)
+      throw Exception("$SID and $SPARENT are reserved property names.")
+
     if (all.containsKey(sProperty.name))
       throw Exception("SProperty '${sProperty.name}' already exists in the SEntity '$name'.")
 
