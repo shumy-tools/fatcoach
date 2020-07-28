@@ -73,7 +73,7 @@ internal class UpdateCompiler(private val dsl: String, private val schema: FcSch
 
     val allInputValues = inputs.toMutableMap()
     fcUpdate.values = inputs
-    self.onUpdate(TxContext(tx.txData, selfID, allInputValues))
+    self.onUpdate(InstructionContext(tx.transaction, selfID, allInputValues))
 
     // check field constraints
     @Suppress("UNCHECKED_CAST")

@@ -1,11 +1,11 @@
 package fc.api.input
 
-import fc.api.FcTxData
+import fc.api.FcTransaction
 import fc.api.RefID
 import fc.api.SEntity
 import fc.api.SProperty
 
-class Transaction(internal val txData: FcTxData) {
+class Transaction(internal val transaction: FcTransaction) {
   val all: List<FcInstruction> = mutableListOf()
 
   fun find(refID: RefID) = all.filter { it.refID == refID }

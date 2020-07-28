@@ -5,7 +5,7 @@ import fc.api.input.DeleteCompiler
 import fc.api.input.UpdateCompiler
 import fc.api.input.Transaction
 
-class FcTxData internal constructor(val db: FcDatabase, private val schema: FcSchema) {
+class FcTransaction internal constructor(val db: FcDatabase, private val schema: FcSchema) {
   internal val tx = Transaction(this)
 
   fun create(dsl: String, vararg args: Pair<String, Any>) = create(dsl, args.toMap())

@@ -332,7 +332,7 @@ class TestInput {
     }
   }
 
-  @Test fun testConstraintChecks() {
+  @Test fun testConstraints() {
     db.tx {
       val error1 = assertFails {
         create("""TestConstraints {

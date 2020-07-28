@@ -3,55 +3,39 @@ package fc.admin
 import fc.adaptor.sql.SQLAdaptor
 import fc.api.FcSchema
 import fc.ws.FcServer
+import java.time.LocalDateTime
 
 fun main() {
   val schema = FcSchema {
-    /* -------------- fields -------------- */
-    master("Simple") {
-      text("aText")
-      int("aInt")
-      long("aLong")
-      float("aFloat")
-      double("aDouble")
-      bool("aBool")
-      time("aTime")
-      date("aDate")
-      datetime("aDateTime")
-      list("aList")
-      map("aMap")
-    }
-
-    master("ComplexJSON") {
-      list("aList")
-      map("aMap")
-    }
-
-    /* -------------- owned/linked refs -------------- */
     val Country = master("Country") {
       text("name")
       text("code")
     }
 
-    master("User") {
+    val Role = master("Role") {
       text("name")
-      ownedRef("address", owned = detail("Address") {
-        text("city")
-        linkedRef("country", Country)
+      datetime("createdAt") {
+        deriveFrom { LocalDateTime.now() }
+      }
+
+      ownedCol("perms", detail("Permission"){
+        text("name")
+        text("script")
       })
     }
 
-    /* -------------- owned/linked cols -------------- */
-    val Permission = master("Permission") {
+    master("User") {
       text("name")
-      text("url")
-    }
+      text("email") {
+        checkIf { it.contains('@') }
+      }
 
-    master("Role") {
-      text("name")
-      ownedCol("details", owned = detail("RoleDetail") {
-        text("name")
-        bool("active")
-        linkedCol("perms", Permission)
+      linkedCol("roles", Role)
+
+      ownedRef("address", detail("Address") {
+        text("city")
+        text("local")
+        linkedRef("country", Country)
       })
     }
   }

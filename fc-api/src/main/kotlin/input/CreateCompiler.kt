@@ -102,7 +102,7 @@ internal class CreateCompiler(private val dsl: String, private val schema: FcSch
 
     val allInputValues = completed.plus(derived).toMutableMap()
     fcCreate.values = allInputValues
-    self.onCreate(TxContext(tx.txData, selfTree.root, allInputValues))
+    self.onCreate(InstructionContext(tx.transaction, selfTree.root, allInputValues))
 
     // check field constraints
     @Suppress("UNCHECKED_CAST")

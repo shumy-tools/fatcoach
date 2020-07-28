@@ -46,8 +46,8 @@ class FcSchema(cfg: Builder.() -> Unit) {
 
 class SEntity internal constructor(val name: String, val type: EType) {
   class Builder(private val self: SEntity) {
-    fun onCreate(callback: (ctx: TxContext) -> Unit) { self.onCreate = callback }
-    fun onUpdate(callback: (ctx: TxContext) -> Unit) { self.onUpdate = callback }
+    fun onCreate(callback: (ctx: InstructionContext) -> Unit) { self.onCreate = callback }
+    fun onUpdate(callback: (ctx: InstructionContext) -> Unit) { self.onUpdate = callback }
 
     fun text(prop: String, cfg: (SField.Builder<String>.() -> Unit)? = null) = self.addField(prop, FType.TEXT, cfg)
     fun int(prop: String, cfg: (SField.Builder<Int>.() -> Unit)? = null) = self.addField(prop, FType.INT, cfg)
@@ -73,8 +73,8 @@ class SEntity internal constructor(val name: String, val type: EType) {
   internal var schema: FcSchema? = null
   internal var parent: SReference? = null
 
-  internal var onCreate: ((ctx: TxContext) -> Unit)? = null
-  internal var onUpdate: ((ctx: TxContext) -> Unit)? = null
+  internal var onCreate: ((ctx: InstructionContext) -> Unit)? = null
+  internal var onUpdate: ((ctx: InstructionContext) -> Unit)? = null
 
   val all: Map<String, SProperty> = linkedMapOf()
   val fields: Map<String, SField<*>> = linkedMapOf()
@@ -88,8 +88,8 @@ class SEntity internal constructor(val name: String, val type: EType) {
   val cols: List<SCollection>
     get() = rels.values.filterIsInstance<SCollection>()
 
-  internal fun onCreate(ctx: TxContext) = onCreate?.invoke(ctx)
-  internal fun onUpdate(ctx: TxContext) = onUpdate?.invoke(ctx)
+  internal fun onCreate(ctx: InstructionContext) = onCreate?.invoke(ctx)
+  internal fun onUpdate(ctx: InstructionContext) = onUpdate?.invoke(ctx)
 
   private fun <T> addField(prop: String, type: FType, cfg: (SField.Builder<T>.() -> Unit)?): SField<T> {
     val builder = SField.Builder<T>()
@@ -222,7 +222,19 @@ interface ICheck<T> {
   fun check(value: T): Boolean
 }
 
-class TxContext(val tx: FcTxData, val selfID: RefID, val values: MutableMap<String, Any?>) {
+class InstructionContext(val tx: FcTransaction, val selfID: RefID, private val values: MutableMap<String, Any?>) {
+  private val ctxVars = ThreadLocal<MutableMap<String, Any>>()
+  fun vars(): MutableMap<String, Any> {
+    var inVars = ctxVars.get()
+    if (inVars == null) {
+      inVars = linkedMapOf()
+      ctxVars.set(inVars)
+    }
+
+    return inVars
+  }
+
+  fun contains(field: SField<*>) = values.contains(field.name)
   fun <T> get(field: SField<T>) = values[field.name]
   fun <T> set(field: SField<T>, value: T) { values[field.name] = value }
 }

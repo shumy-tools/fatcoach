@@ -22,7 +22,7 @@ fun createCorrectSchema() = FcSchema {
       checkIf { it.endsWith("Text") }
     }
 
-    text("aDerived") {
+    val aDerivedField = text("aDerived") {
       deriveFrom { "aDerivedValue" }
     }
 
@@ -31,14 +31,14 @@ fun createCorrectSchema() = FcSchema {
     onCreate {
       val aInt = it.get(aIntField)
       val aText = it.get(aTextField)
-      val aDerived = it.values["aDerived"] as String
+      val aDerived = it.get(aDerivedField)
       if (aInt == 10 && aText == "newText" && aDerived == "aDerivedValue")
         throw Exception("Testing onCreate")
     }
 
     onUpdate {
       val id = it.selfID.id
-      val aText = it.values["aText"] as String
+      val aText = it.get(aTextField)
       if (id == 1L && aText == "u-newText")
         throw Exception("Testing onUpdate")
     }
