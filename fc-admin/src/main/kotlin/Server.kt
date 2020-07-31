@@ -44,5 +44,5 @@ fun main() {
     it.createSchema(schema)
   }
 
-  FcServer(adaptor).start(9090)
+  FcServer(adaptor).start(9090, allOrigins = true)
 }

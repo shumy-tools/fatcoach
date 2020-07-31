@@ -7,6 +7,13 @@
 	"settings": {
 		"files.exclude": {
 			"**/*.log": true,
+			"**/build": true,
+			"**/node_modules": true,
+			"**/.vscode": true,
+			".gradle": true,
+			".idea": true,
+			"gradle*": true,
+			".gitignore": true,
 			"LICENSE": true,
 			"fc-ide/.*": true,
 			"fc-ide/src/env.d.ts": true,

@@ -118,8 +118,8 @@ class SEntity internal constructor(val name: String, val type: EType) {
     return sCol
   }
 
-  private fun addProperty(sProperty: SProperty) {
-    if (sProperty.name == SID || sProperty.name == SPARENT)
+  private fun addProperty(sProperty: SProperty, ignoreReserved: Boolean = false) {
+    if (!ignoreReserved && (sProperty.name == SID || sProperty.name == SPARENT))
       throw Exception("$SID and $SPARENT are reserved property names.")
 
     if (all.containsKey(sProperty.name))
@@ -138,7 +138,9 @@ class SEntity internal constructor(val name: String, val type: EType) {
           if (sProperty.ref.parent != null)
             throw Exception("SEntity '${sProperty.ref.name}' already owned by '$name'.")
 
-          sProperty.ref.parent = sProperty.ref.addRef(SPARENT, RType.LINKED, this, null)
+          val sParent = SReference(sProperty.ref, SPARENT, RType.LINKED, this, SReference.Builder())
+          sProperty.ref.addProperty(sParent, true)
+          sProperty.ref.parent = sParent
         }
         (rels as LinkedHashMap<String, SRelation>)[sProperty.name] = sProperty
       }

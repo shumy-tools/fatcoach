@@ -17,8 +17,10 @@ class FcServer(val adaptor: IAdaptor, val authorizer: IAuthorizer? = null) {
   private val cache = ConcurrentHashMap<String, Query>()
   private val db = FcDatabase(adaptor, authorizer)
 
-  fun start(port: Int) {
-    val app = Javalin.create().start(port)
+  fun start(port: Int, allOrigins: Boolean = false) {
+    val app = Javalin.create {
+      if (allOrigins) it.enableCorsForAllOrigins()
+    }.start(port)
 
     app.get("/") { ctx -> ctx.result("Hello FcServer") }
 
@@ -99,22 +101,25 @@ class FcServer(val adaptor: IAdaptor, val authorizer: IAuthorizer? = null) {
     val query = cache.getOrPut(hash) { db.query(req.code) }
 
     // check and convert input parameters
-    val params = if (req.args.isNotEmpty()) {
-      query.parameters.map {
-        val qParamValue = req.args[it.name] ?: throw Exception("Expecting input parameter $it.")
-        val value = TypeEngine.tryConvertParam(it.type, qParamValue)
-        it.name to value
-      }.toMap()
-    } else emptyMap()
+    val res = if (req.args != null) {
+      val params = if (req.args.isNotEmpty()) {
+        query.parameters.map {
+          val qParamValue = req.args[it.name] ?: throw Exception("Expecting input parameter $it.")
+          val value = TypeEngine.tryConvertParam(it.type, qParamValue)
+          it.name to value
+        }.toMap()
+      } else emptyMap()
 
-    // execute and send results
-    val res = query.exec(params)
+      query.exec(params)
+    } else
+      query.exec()
+
     mutableMapOf<String, Any>("@type" to "ok").also { it["result"] = res.rows }
   }
 }
 
 /* ------------------------- helpers -------------------------*/
-data class CodeRequest(val code: String, val args: Map<String, String>)
+data class CodeRequest(val code: String, val args: Map<String, String>? = null)
 
 private fun handle(ctx: Context, handler: (Context) -> Map<String, Any>) {
   val res = try {
