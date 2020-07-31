@@ -23,7 +23,7 @@ Lets assume the following data model in UML:
 Given the example, existing structured islands are: (```User```, ```Address```), (```Role```, ```Permission```) and (```Country```). Island connections, or linked relations are: ```User::roles``` and ```Address::country```.
 This modeling scheme is very useful to isolate and identify different parts of the model that are normally associated to different purposes. It also easily identifies master/details structures that are normally related with UI design patterns, alleviating the model mismatch between the DB and UI.
 
-The schema is defined in Koltin via:
+The schema is defined in Kotlin via:
 ```kotlin
 val schema = FcSchema {
   val Country = master("Country") {
@@ -62,7 +62,7 @@ val schema = FcSchema {
 
 ### Input DSL
 * Creating two ```Country``` entries and returning the ids, @id = [1, 2].
-```
+```graphql
 Country {
   name: "Spain",
   code: "ES"
@@ -75,7 +75,7 @@ Country {
 ```
 
 * Creating two ```Role``` entries with owned ```Permission``` entries and returning @id = [1, 2].
-```
+```graphql
 Role {
   name: "admin",
   perms: [
@@ -94,7 +94,7 @@ Role {
 ```
 
 * Creating a ```User``` entry with an owned ```address``` referencing the ```Country``` entry, and a list of ```Role``` references. Returning @id = 1.
-```
+```graphql
 User {
   name: "Alex",
   email: "alex@mail.com",
@@ -108,7 +108,7 @@ User {
 ```
 
 * Updating the ```User``` name and removing the ```Role``` where @id = 1.
-```
+```graphql
 User @id == 1 {
   name: "Alex Dupon",
   roles: @del 1
@@ -116,7 +116,7 @@ User @id == 1 {
 ```
 
 * Adding another ```Address``` detail to the ```User``` via create, using the @parent reference.
-```
+```graphql
 Address {
   @parent: 1,
   city: "Aveiro",
@@ -129,7 +129,7 @@ Address {
 A query returns a sub-tree snapshot of the database graph. 
 
 * Queering ```User``` entries filtered by ```User::name``` and ```User::address.country.name```. Returns a JSON structure for the selected fields, including the inner fields for the Address reference. The ```*``` symbol is the selector for all fields. 
-```
+```graphql
 User | name == "Alex" and address.country.name == "Spain" | {
   name,
   address {
@@ -140,12 +140,12 @@ User | name == "Alex" and address.country.name == "Spain" | {
 ```
 
 * Page and limit can be applied after the filter (if exists).
-```
+```graphql
 User limit 2 page 1 { * }
 ```
 
 * Sorting can be applied to each field.
-```
+```graphql
 User {
   (asc 1) name,
   (dsc 2) email
@@ -153,7 +153,7 @@ User {
 ```
 
 * Sub-filters can be applied to collections.
-```
+```graphql
 User {
   *,
   roles | name == "admin" | { * }
@@ -161,7 +161,7 @@ User {
 ```
 
 * Query parameters can be used in multiple places.
-```
+```graphql
 User | name == ?name and address.city == "Aveiro" | limit ?limit {
   name,
   roles { * }
