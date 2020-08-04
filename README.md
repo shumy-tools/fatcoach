@@ -169,9 +169,41 @@ User | name == ?name and address.city == "Aveiro" | limit ?limit {
 ```
 
 ### Setup Test Environment
-* Get and setup the FatCoach project:
+* Get the FatCoach project:
 ```
 npx degit shumy-tools/fatcoach fc-test
 cd fc-test
+```
+
+* In console 1) Start the Kotlin server:
+```
 ./gradlew build
+./gradlew :fc-template:server:run
+```
+
+* In console 2) Start the Web Dev server:
+```
+cd fc-template/client
+npm install
+npm run dev
+```
+
+* Open the example web console at 'http://localhost:8080/'.
+* Insert 2 ```Country``` entries and query results (press F9 to execute commands):
+```graphql
+create Country {
+	name: "Portugal",
+  code: "PT"
+}
+```
+
+```graphql
+create Country {
+	name: "Spain",
+  code: "ES"
+}
+```
+
+```graphql
+query Country | code == "PT" | { * }
 ```
