@@ -175,13 +175,13 @@ npx degit shumy-tools/fatcoach fc-test
 cd fc-test
 ```
 
-* In console 1) Start the Kotlin server:
+* In console 1) Setup and start the Kotlin server:
 ```
 ./gradlew build
 ./gradlew :fc-template:server:run
 ```
 
-* In console 2) Start the Web Dev server:
+* In console 2) Setup and start the Web Dev server:
 ```
 cd fc-template/client
 npm install
@@ -192,14 +192,14 @@ npm run dev
 * Insert 2 ```Country``` entries and query results (press F9 to execute commands):
 ```graphql
 create Country {
-	name: "Portugal",
+  name: "Portugal",
   code: "PT"
 }
 ```
 
 ```graphql
 create Country {
-	name: "Spain",
+  name: "Spain",
   code: "ES"
 }
 ```
@@ -207,3 +207,5 @@ create Country {
 ```graphql
 query Country | code == "PT" | { * }
 ```
+
+* Change the model and configuration to your desire in ```fc-template/server/src/main/kotlin/Server.kt```.
