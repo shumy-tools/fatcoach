@@ -37,7 +37,9 @@ export interface SCollection {
 }
 
 export class FcClient {
-    constructor(readonly url: string, readonly onError: (msg: string) => void) {
+    url = ''
+
+    constructor(readonly onError: (msg: string) => void) {
         axios.interceptors.response.use(response => {
         console.log('API-RESPONSE: ', response.data)
             return response

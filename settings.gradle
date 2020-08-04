@@ -1,3 +1,3 @@
-include 'fc-api', 'fc-ws', 'fc-sql-adaptor', 'fc-admin'
+include 'fc-api', 'fc-ws', 'fc-sql-adaptor', 'fc-admin', 'fc-template:server'
 
 rootProject.name = 'fatcoach'

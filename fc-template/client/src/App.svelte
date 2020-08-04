@@ -2,7 +2,7 @@
 	import Client from './api'
 	import CodeMirror from './comp/CodeMirror.svelte'
 	
-	const api = new Client('http://localhost:9090', error => {
+	const api = new Client(error => {
 		console.log('ERROR: ', error)
 	})
 

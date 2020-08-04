@@ -6,29 +6,9 @@ import { terser } from 'rollup-plugin-terser';
 import sveltePreprocess from 'svelte-preprocess';
 import typescript from '@rollup/plugin-typescript';
 import css from 'rollup-plugin-css-only';
+import serve from 'rollup-plugin-serve-proxy';
 
 const production = !process.env.ROLLUP_WATCH;
-
-function serve() {
-	let server;
-	
-	function toExit() {
-		if (server) server.kill(0);
-	}
-
-	return {
-		writeBundle() {
-			if (server) return;
-			server = require('child_process').spawn('npm', ['run', 'start', '--', '--dev'], {
-				stdio: ['ignore', 'inherit', 'inherit'],
-				shell: true
-			});
-
-			process.on('SIGTERM', toExit);
-			process.on('exit', toExit);
-		}
-	};
-}
 
 export default {
 	input: 'src/main.ts',
@@ -63,9 +43,14 @@ export default {
 		commonjs(),
 		typescript({ sourceMap: !production }),
 
-		// In dev mode, call `npm run start` once
+		// In dev mode, use 'rollup-plugin-serve-proxy'
 		// the bundle has been generated
-		!production && serve(),
+		!production && serve({
+			contentBase: 'public',
+			port: 8080,
+			headers: { 'Access-Control-Allow-Origin': '*' },
+			proxy: { api: 'http://localhost:9090' }
+		}),
 
 		// Watch the `public` directory and refresh the
 		// browser on changes when not in production

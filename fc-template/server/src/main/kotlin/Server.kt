@@ -1,4 +1,4 @@
-package fc.admin
+package fc.template
 
 import fc.adaptor.sql.SQLAdaptor
 import fc.api.FcSchema

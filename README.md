@@ -168,5 +168,10 @@ User | name == ?name and address.city == "Aveiro" | limit ?limit {
 }
 ```
 
-### Using the Client
-TODO
+### Setup Test Environment
+* Get and setup the FatCoach project:
+```
+npx degit shumy-tools/fatcoach fc-test
+cd fc-test
+./gradlew build
+```
