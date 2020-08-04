@@ -51,7 +51,7 @@
 	})
 </script>
 
-<div class="h-full w-1/2 border border-gray-300">
+<div class="h-full w-full border border-gray-300">
     <textarea bind:this={ide}></textarea>
 </div>
 

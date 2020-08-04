@@ -41,17 +41,18 @@ export class FcClient {
 
     constructor(readonly onError: (msg: string) => void) {
         axios.interceptors.response.use(response => {
-        console.log('API-RESPONSE: ', response.data)
+            console.log('API-RESPONSE: ', response.data)
+            if (response.data['@type'] == 'error') {
+                console.log('API-ERROR: ', response.data.msg)
+                this.onError(response.data.msg)
+            }
+
             return response
         }, error => this.onError(error.msg))
     }
 
     async schema(): Promise<Schema> {
         const res = await axios.get(this.url + '/api/schema')
-        if (res.data['@type'] !== 'ok') {
-            this.onError(res.data.result)
-        }
-
         return res.data.result
     }
 
@@ -66,37 +67,21 @@ export class FcClient {
 
     async create(code: string, args?: any): Promise<any> {
         const res = await axios.post(this.url + '/api/create', { code, args })
-        if (res.data['@type'] !== 'ok') {
-            this.onError(res.data.result)
-        }
-
         return res.data.result
     }
 
     async update(code: string, args?: any): Promise<any> {
         const res = await axios.post(this.url + '/api/update', { code, args })
-        if (res.data['@type'] !== 'ok') {
-            this.onError(res.data.result)
-        }
-
         return res.data.result
     }
 
     async delete(code: string, args?: any): Promise<any> {
         const res = await axios.post(this.url + '/api/delete', { code, args })
-        if (res.data['@type'] !== 'ok') {
-            this.onError(res.data.result)
-        }
-
         return res.data.result
     }
 
     async query(code: string, args?: any): Promise<any> {
         const res = await axios.post(this.url + '/api/query', { code, args })
-        if (res.data['@type'] !== 'ok') {
-            this.onError(res.data.result)
-        }
-
         return res.data.result
     }
 }
