@@ -29,7 +29,7 @@
   },
   "dependencies": {
     "@types/codemirror": "0.0.97",
-    "axios": "^0.19.2",
+    "axios": "^0.21.1",
     "codemirror": "^5.56.0"
   }
 }
