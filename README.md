@@ -1,4 +1,4 @@
-# FatCoach (experimental)
+# fatcoach
 An experimental alternative to GraphQL for relational databases.
 
 #### The lazy coach who helps you achieve your goal.
