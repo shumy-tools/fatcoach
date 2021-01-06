@@ -1,4 +1,6 @@
 # FatCoach (experimental)
+An experimental alternative to GraphQL for relational databases.
+
 #### The lazy coach who helps you achieve your goal.
 FatCoach is a Back-End as a Service (BaaS) framework (in Kotlin) which abstracts the underlying SQL database from Front-End developers.
 Front-end developers use a domain-specific language (DSL) to input data and to query the database. 
